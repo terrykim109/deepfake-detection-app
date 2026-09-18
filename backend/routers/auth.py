@@ -4,6 +4,7 @@ from firebase_config import db
 
 from schemas import UserCreate, UserLogin, UserResponse, TokenResponse
 from helpers import generate_id, now_iso, log_event, user_from_doc
+from config import SESSION_TIMEOUT_MINUTES
 
 router = APIRouter(tags=["auth"])
 
@@ -16,6 +17,13 @@ async def options_login(request: Request):
 @router.options("/auth/signup")
 async def options_signup(request: Request):
     return {}
+
+
+@router.get("/auth/session-config")
+async def session_config():
+    """Expose inactivity timeout so the frontend can match the backend."""
+    return {"timeout_minutes": SESSION_TIMEOUT_MINUTES}
+
 
 @router.post("/auth/signup", response_model=TokenResponse)
 async def signup(body: UserCreate):
@@ -47,6 +55,7 @@ async def signup(body: UserCreate):
         user=user_from_doc(user_id, user_doc)
     )
 
+
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(body: UserLogin):
     docs = users_ref.where(filter=FieldFilter("email", "==", body.email)).limit(1).get()
@@ -68,11 +77,13 @@ async def login(body: UserLogin):
         user=user_from_doc(user_id, {**user_doc, "user_id": user_id})
     )
 
+
 @router.post("/auth/logout")
 async def logout(user_id: str | None = None):
     if user_id:
         log_event("auth_logout", f"User {user_id} logged out", user_id)
     return {"message": "Logged out successfully"}
+
 
 @router.get("/auth/me", response_model=UserResponse)
 async def get_current_user(user_id: str):

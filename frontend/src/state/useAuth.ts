@@ -1,8 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { authApi, type UserResponse } from '../api/client'
+import {
+  clearLastActivity,
+  useInactivityTimeout,
+  writeLastActivity,
+} from './useInactivityTimeout'
 
 const TOKEN_KEY = 'dfd.token'
 const USER_KEY = 'dfd.user'
+const DEFAULT_TIMEOUT_MINUTES = 30
 
 function loadStored(): { token: string | null; user: UserResponse | null } {
   try {
@@ -18,11 +24,13 @@ function loadStored(): { token: string | null; user: UserResponse | null } {
 function saveStored(token: string, user: UserResponse) {
   sessionStorage.setItem(TOKEN_KEY, token)
   sessionStorage.setItem(USER_KEY, JSON.stringify(user))
+  writeLastActivity()
 }
 
 function clearStored() {
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(USER_KEY)
+  clearLastActivity()
 }
 
 export interface Profile {
@@ -39,12 +47,13 @@ export interface AuthState {
   loading: boolean
   saving: boolean
   error: string
+  sessionTimeoutMinutes: number
 }
 
 export interface AuthActions {
   signUp: (email: string, password: string, displayName?: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
-  signOut: () => Promise<void>
+  signOut: (opts?: { reason?: 'manual' | 'inactivity' }) => Promise<void>
   updateProfile: (next: Profile) => Promise<void>
   clearError: () => void
 }
@@ -88,6 +97,18 @@ export function useAuth(): AuthState & AuthActions {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(DEFAULT_TIMEOUT_MINUTES)
+
+  useEffect(() => {
+    let cancelled = false
+    authApi.sessionConfig().then((res) => {
+      if (cancelled || !res.data?.timeout_minutes) return
+      setSessionTimeoutMinutes(res.data.timeout_minutes)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const storedUser = stored.user
@@ -146,14 +167,24 @@ export function useAuth(): AuthState & AuthActions {
     setLoading(false)
   }, [])
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (opts?: { reason?: 'manual' | 'inactivity' }) => {
     setLoading(true)
-    if (user?.user_id) await authApi.logout(user.user_id)
-    clearStored()
-    setToken(null)
-    setUser(null)
-    setProfile(emptyProfile())
-    setLoading(false)
+    try {
+      if (user?.user_id) await authApi.logout(user.user_id)
+    } finally {
+      clearStored()
+      if (opts?.reason === 'inactivity') {
+        try {
+          sessionStorage.setItem('dfd.sessionExpired', 'inactivity')
+        } catch {
+          /* ignore */
+        }
+      }
+      setToken(null)
+      setUser(null)
+      setProfile(emptyProfile())
+      setLoading(false)
+    }
   }, [user])
 
   /* Update profile — saves to backend AND updates local state */
@@ -196,5 +227,27 @@ export function useAuth(): AuthState & AuthActions {
     setSaving(false)
   }, [user, token])
 
-  return { user, token, profile, loading, saving, error, signUp, signIn, signOut, updateProfile, clearError }
+  // Inactivity auto-logout
+  useInactivityTimeout(
+    Boolean(user && token),
+    () => {
+      void signOut({ reason: 'inactivity' })
+    },
+    sessionTimeoutMinutes * 60 * 1000,
+  )
+
+  return {
+    user,
+    token,
+    profile,
+    loading,
+    saving,
+    error,
+    sessionTimeoutMinutes,
+    signUp,
+    signIn,
+    signOut,
+    updateProfile,
+    clearError,
+  }
 }
