@@ -66,6 +66,10 @@ export interface TokenResponse {
   user: UserResponse
 }
 
+export interface SessionConfig {
+  timeout_minutes: number
+}
+
 export const authApi = {
   signup: (email: string, password: string, displayName?: string) =>
     post<TokenResponse>('/api/auth/signup', { email, password, display_name: displayName }),
@@ -78,6 +82,8 @@ export const authApi = {
 
   me: (userId: string) =>
     get<UserResponse>(`/api/auth/me?user_id=${encodeURIComponent(userId)}`),
+
+  sessionConfig: () => get<SessionConfig>('/api/auth/session-config'),
 
   updateProfile: (userId: string, profile: { first_name?: string; last_name?: string; email?: string; phone?: string }) =>
     put<UserResponse>(`/api/users/${userId}/profile`, profile),

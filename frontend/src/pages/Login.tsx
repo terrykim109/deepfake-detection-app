@@ -1,18 +1,30 @@
 // Login.tsx
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAppState } from '../state/AppState'
+import { consumeSessionExpired } from '../state/useInactivityTimeout'
 
 export const Login: React.FC = () => {
   const navigate = useNavigate()
-  const { signIn, error, clearError, loading } = useAppState()
+  const { signIn, error, clearError, loading, sessionTimeoutMinutes } = useAppState()
   const [showPassword, setShowPassword] = useState(false)
   const [localError, setLocalError] = useState('')
+  const [sessionNote, setSessionNote] = useState('')
+
+  useEffect(() => {
+    const reason = consumeSessionExpired()
+    if (reason === 'inactivity') {
+      setSessionNote(
+        `Your session ended after ${sessionTimeoutMinutes} minutes of inactivity. Please log in again.`,
+      )
+    }
+  }, [sessionTimeoutMinutes])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLocalError('')
+    setSessionNote('')
     clearError()
 
     const form = e.target as HTMLFormElement
@@ -26,7 +38,7 @@ export const Login: React.FC = () => {
 
     try {
       await signIn(email, password)
-      navigate('/upload')
+      navigate('/profile')
     } catch {
       // error surfaced via useAuth
     }
@@ -42,6 +54,8 @@ export const Login: React.FC = () => {
 
       <main className="auth-main">
         <h1 className="auth-title">Log in</h1>
+
+        {sessionNote && <p className="auth-error">{sessionNote}</p>}
 
         <form onSubmit={submit}>
           <div className="field">
