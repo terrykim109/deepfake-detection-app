@@ -157,6 +157,39 @@ export function useAuth(): AuthState & AuthActions {
 
   const clearError = useCallback(() => setError(''), [])
 
+  const persistFirebaseUser = useCallback(
+    async (
+      uid: string,
+      email: string,
+      displayName: string | null | undefined,
+      idToken: string,
+      createdAt: string,
+    ) => {
+      const localUser = applyUser({
+        id: uid,
+        user_id: uid,
+        email,
+        display_name: displayName,
+        auth_provider: 'firebase',
+        created_at: createdAt,
+      })
+
+      const synced = await authApi.syncUser({
+        user_id: uid,
+        email,
+        display_name: displayName,
+        auth_provider: 'firebase',
+      })
+
+      const nextUser = applyUser(synced.data || localUser, localUser)
+      saveStored(idToken, nextUser)
+      setToken(idToken)
+      setUser(nextUser)
+      setProfile(buildProfile(nextUser))
+    },
+    [],
+  )
+
   const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
     setLoading(true)
     setError('')
@@ -166,20 +199,16 @@ export function useAuth(): AuthState & AuthActions {
         await updateFirebaseProfile(credential.user, { displayName })
       }
       const idToken = await credential.user.getIdToken()
-      const nextUser = applyUser({
-        id: credential.user.uid,
-        user_id: credential.user.uid,
-        email: credential.user.email || email,
-        display_name: displayName || credential.user.displayName,
-        auth_provider: 'firebase',
-        created_at: credential.user.metadata.creationTime
-          ? new Date(credential.user.metadata.creationTime).toISOString()
-          : new Date().toISOString(),
-      })
-      saveStored(idToken, nextUser)
-      setToken(idToken)
-      setUser(nextUser)
-      setProfile(buildProfile(nextUser))
+      const createdAt = credential.user.metadata.creationTime
+        ? new Date(credential.user.metadata.creationTime).toISOString()
+        : new Date().toISOString()
+      await persistFirebaseUser(
+        credential.user.uid,
+        credential.user.email || email,
+        displayName || credential.user.displayName,
+        idToken,
+        createdAt,
+      )
       setLoading(false)
     } catch (err) {
       const message = firebaseAuthErrorMessage(err)
@@ -187,7 +216,7 @@ export function useAuth(): AuthState & AuthActions {
       setLoading(false)
       throw new Error(message)
     }
-  }, [])
+  }, [persistFirebaseUser])
 
   const signIn = useCallback(async (email: string, password: string) => {
     setLoading(true)
@@ -195,20 +224,16 @@ export function useAuth(): AuthState & AuthActions {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password)
       const idToken = await credential.user.getIdToken()
-      const nextUser = applyUser({
-        id: credential.user.uid,
-        user_id: credential.user.uid,
-        email: credential.user.email || email,
-        display_name: credential.user.displayName,
-        auth_provider: 'firebase',
-        created_at: credential.user.metadata.creationTime
-          ? new Date(credential.user.metadata.creationTime).toISOString()
-          : '',
-      })
-      saveStored(idToken, nextUser)
-      setToken(idToken)
-      setUser(nextUser)
-      setProfile(buildProfile(nextUser))
+      const createdAt = credential.user.metadata.creationTime
+        ? new Date(credential.user.metadata.creationTime).toISOString()
+        : ''
+      await persistFirebaseUser(
+        credential.user.uid,
+        credential.user.email || email,
+        credential.user.displayName,
+        idToken,
+        createdAt,
+      )
       setLoading(false)
     } catch (err) {
       const message = firebaseAuthErrorMessage(err)
@@ -216,7 +241,7 @@ export function useAuth(): AuthState & AuthActions {
       setLoading(false)
       throw new Error(message)
     }
-  }, [])
+  }, [persistFirebaseUser])
 
   const signOut = useCallback(async (opts?: { reason?: 'manual' | 'inactivity' }) => {
     setLoading(true)

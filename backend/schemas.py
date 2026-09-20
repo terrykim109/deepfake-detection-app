@@ -22,6 +22,14 @@ class ProfileUpdate(BaseModel):
     phone: str = ""
 
 
+# Sync Firebase Auth user into Firestore profiles
+class UserSync(BaseModel):
+    user_id: str
+    email: str = ""
+    display_name: str | None = None
+    auth_provider: str = "firebase"
+
+
 # User response schema
 class UserResponse(BaseModel):
     """Response body for authenticated user data."""

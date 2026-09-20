@@ -85,6 +85,13 @@ export const authApi = {
 
   sessionConfig: () => get<SessionConfig>('/api/auth/session-config'),
 
+  syncUser: (user: {
+    user_id: string
+    email: string
+    display_name?: string | null
+    auth_provider?: string
+  }) => post<UserResponse>('/api/users/sync', user),
+
   updateProfile: (userId: string, profile: { first_name?: string; last_name?: string; email?: string; phone?: string }) =>
     put<UserResponse>(`/api/users/${userId}/profile`, profile),
 }
