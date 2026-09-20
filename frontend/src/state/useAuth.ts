@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile as updateFirebaseProfile,
+} from 'firebase/auth'
 import { authApi, type UserResponse } from '../api/client'
+import { auth } from '../firebase'
 import {
   clearLastActivity,
   useInactivityTimeout,
@@ -33,6 +39,27 @@ function clearStored() {
   clearLastActivity()
 }
 
+/* Map a Firebase Auth error code to a user-facing message */
+function firebaseAuthErrorMessage(err: unknown): string {
+  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists. Please log in instead.'
+    case 'auth/weak-password':
+      return 'Password should be at least 6 characters.'
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.'
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Invalid email or password. Please try again.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.'
+    default:
+      return err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+  }
+}
+
 export interface Profile {
   firstName: string
   lastName: string
@@ -62,7 +89,6 @@ function emptyProfile(): Profile {
   return { firstName: '', lastName: '', email: '', phone: '' }
 }
 
-/* Build a Profile from the backend user record */
 function buildProfile(user: UserResponse | null): Profile {
   if (!user) return emptyProfile()
   const names = (user.display_name || '').split(' ')
@@ -131,41 +157,91 @@ export function useAuth(): AuthState & AuthActions {
 
   const clearError = useCallback(() => setError(''), [])
 
+  const persistFirebaseUser = useCallback(
+    async (
+      uid: string,
+      email: string,
+      displayName: string | null | undefined,
+      idToken: string,
+      createdAt: string,
+    ) => {
+      const localUser = applyUser({
+        id: uid,
+        user_id: uid,
+        email,
+        display_name: displayName,
+        auth_provider: 'firebase',
+        created_at: createdAt,
+      })
+
+      const synced = await authApi.syncUser({
+        user_id: uid,
+        email,
+        display_name: displayName,
+        auth_provider: 'firebase',
+      })
+
+      const nextUser = applyUser(synced.data || localUser, localUser)
+      saveStored(idToken, nextUser)
+      setToken(idToken)
+      setUser(nextUser)
+      setProfile(buildProfile(nextUser))
+    },
+    [],
+  )
+
   const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
     setLoading(true)
     setError('')
-    const res = await authApi.signup(email, password, displayName)
-    if (res.error) {
-      setError(res.error)
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+      if (displayName) {
+        await updateFirebaseProfile(credential.user, { displayName })
+      }
+      const idToken = await credential.user.getIdToken()
+      const createdAt = credential.user.metadata.creationTime
+        ? new Date(credential.user.metadata.creationTime).toISOString()
+        : new Date().toISOString()
+      await persistFirebaseUser(
+        credential.user.uid,
+        credential.user.email || email,
+        displayName || credential.user.displayName,
+        idToken,
+        createdAt,
+      )
       setLoading(false)
-      throw new Error(res.error)
+    } catch (err) {
+      const message = firebaseAuthErrorMessage(err)
+      setError(message)
+      setLoading(false)
+      throw new Error(message)
     }
-    const data = res.data!
-    const nextUser = applyUser(data.user)
-    saveStored(data.access_token, nextUser)
-    setToken(data.access_token)
-    setUser(nextUser)
-    setProfile(buildProfile(nextUser))
-    setLoading(false)
-  }, [])
+  }, [persistFirebaseUser])
 
   const signIn = useCallback(async (email: string, password: string) => {
     setLoading(true)
     setError('')
-    const res = await authApi.login(email, password)
-    if (res.error) {
-      setError(res.error)
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      const idToken = await credential.user.getIdToken()
+      const createdAt = credential.user.metadata.creationTime
+        ? new Date(credential.user.metadata.creationTime).toISOString()
+        : ''
+      await persistFirebaseUser(
+        credential.user.uid,
+        credential.user.email || email,
+        credential.user.displayName,
+        idToken,
+        createdAt,
+      )
       setLoading(false)
-      throw new Error(res.error)
+    } catch (err) {
+      const message = firebaseAuthErrorMessage(err)
+      setError(message)
+      setLoading(false)
+      throw new Error(message)
     }
-    const data = res.data!
-    const nextUser = applyUser(data.user)
-    saveStored(data.access_token, nextUser)
-    setToken(data.access_token)
-    setUser(nextUser)
-    setProfile(buildProfile(nextUser))
-    setLoading(false)
-  }, [])
+  }, [persistFirebaseUser])
 
   const signOut = useCallback(async (opts?: { reason?: 'manual' | 'inactivity' }) => {
     setLoading(true)
@@ -187,45 +263,47 @@ export function useAuth(): AuthState & AuthActions {
     }
   }, [user])
 
-  /* Update profile — saves to backend AND updates local state */
-  const updateProfile = useCallback(async (next: Profile) => {
-    if (!user?.user_id) {
-      const msg = 'You must be logged in to update your profile.'
-      setError(msg)
-      throw new Error(msg)
-    }
-    setSaving(true)
-    setError('')
+  const updateProfile = useCallback(
+    async (next: Profile) => {
+      if (!user?.user_id) {
+        const msg = 'You must be logged in to update your profile.'
+        setError(msg)
+        throw new Error(msg)
+      }
+      setSaving(true)
+      setError('')
 
-    const res = await authApi.updateProfile(user.user_id, {
-      first_name: next.firstName,
-      last_name: next.lastName,
-      email: next.email,
-      phone: next.phone,
-    })
-
-    if (res.error) {
-      setError(res.error)
-      setSaving(false)
-      throw new Error(res.error)
-    }
-
-    const updatedUser = applyUser(
-      res.data || {
-        ...user,
-        display_name: `${next.firstName} ${next.lastName}`.trim(),
-        email: next.email,
+      const res = await authApi.updateProfile(user.user_id, {
         first_name: next.firstName,
         last_name: next.lastName,
+        email: next.email,
         phone: next.phone,
-      },
-      next,
-    )
-    saveStored(token || '', updatedUser)
-    setUser(updatedUser)
-    setProfile(buildProfile(updatedUser))
-    setSaving(false)
-  }, [user, token])
+      })
+
+      if (res.error) {
+        setError(res.error)
+        setSaving(false)
+        throw new Error(res.error)
+      }
+
+      const updatedUser = applyUser(
+        res.data || {
+          ...user,
+          display_name: `${next.firstName} ${next.lastName}`.trim(),
+          email: next.email,
+          first_name: next.firstName,
+          last_name: next.lastName,
+          phone: next.phone,
+        },
+        next,
+      )
+      saveStored(token || '', updatedUser)
+      setUser(updatedUser)
+      setProfile(buildProfile(updatedUser))
+      setSaving(false)
+    },
+    [user, token],
+  )
 
   // Inactivity auto-logout
   useInactivityTimeout(
