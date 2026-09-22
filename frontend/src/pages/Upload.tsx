@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell'
 import { StepIndicator } from '../components/StepIndicator'
 import { useAppState } from '../state/AppState'
 import { TIPS, TIPS_LEAD } from '../data/mock'
+import { validateUploadSelection } from '../upload/validateUpload'
 
 /* Figma frame "Image Upload" (node 20:12).
 
@@ -12,7 +13,7 @@ import { TIPS, TIPS_LEAD } from '../data/mock'
    addition, styled with the design's own button treatment. */
 export const Upload: React.FC = () => {
   const navigate = useNavigate()
-  const { runAnalysis } = useAppState()
+  const { runAnalysis, analyzing, user } = useAppState()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [file, setFile] = useState<File | null>(null)
@@ -28,8 +29,6 @@ export const Upload: React.FC = () => {
 
   useEffect(
     () => () => {
-      // Cancel a pending run — otherwise navigating away mid analysis
-      // still fires navigate('/results') a second later.
       abortRef.current?.abort()
       if (previewRef.current && !handedOff.current) {
         URL.revokeObjectURL(previewRef.current)
@@ -46,13 +45,6 @@ export const Upload: React.FC = () => {
     setPreview(next)
   }
 
-  const accept = (picked: File | undefined) => {
-    if (!picked || !picked.type.startsWith('image/')) return
-    setFile(picked)
-    setPreviewUrl(URL.createObjectURL(picked))
-    setError('')
-  }
-
   const clear = () => {
     setFile(null)
     setPreviewUrl(null)
@@ -60,11 +52,39 @@ export const Upload: React.FC = () => {
     if (inputRef.current) inputRef.current.value = ''
   }
 
-  /* Hold on step 2 until the detector answers, then hand off to the
-     results screen. On failure we keep the file and the blob so the
-     user can retry — handedOff only flips once the run is committed. */
+  const accept = async (files: FileList | File[] | null | undefined) => {
+    setError('')
+    const result = await validateUploadSelection(files)
+    if (!result.ok) {
+      // Keep a clear re-upload path: drop rejected file, show how to fix
+      setFile(null)
+      setPreviewUrl(null)
+      if (inputRef.current) inputRef.current.value = ''
+      setError(result.message)
+      return
+    }
+
+    setFile(result.file)
+    setPreviewUrl(URL.createObjectURL(result.file))
+    setError('')
+  }
+
   const analyze = async () => {
-    if (!file) return
+    if (!user) {
+      setError('Please log in before uploading an image for analysis.')
+      return
+    }
+    if (!file) {
+      setError('Choose one JPG, JPEG, PNG, or WEBP image under 10 MB to continue.')
+      return
+    }
+    if (processing || analyzing) {
+      setError(
+        'You already have an analysis in progress. Please wait for it to finish before uploading another image.',
+      )
+      return
+    }
+
     setProcessing(true)
     setError('')
 
@@ -72,16 +92,27 @@ export const Upload: React.FC = () => {
     abortRef.current = controller
 
     try {
+      // Re-validate immediately before submission
+      const recheck = await validateUploadSelection([file])
+      if (!recheck.ok) {
+        setProcessing(false)
+        setError(recheck.message)
+        return
+      }
+
       await runAnalysis(file, preview, controller.signal)
       handedOff.current = true
       navigate('/results')
     } catch (err) {
-      // Aborted means we unmounted; the cleanup has already revoked.
       if (controller.signal.aborted) return
       setProcessing(false)
-      setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
+      setError(err instanceof Error ? err.message : 'Analysis failed. Please try again with another image.')
+      // Keep Clear / file picker available so the user can re-upload
+      if (inputRef.current) inputRef.current.value = ''
     }
   }
+
+  const busy = processing || analyzing
 
   return (
     <AppShell>
@@ -90,7 +121,7 @@ export const Upload: React.FC = () => {
       <section className="panel upload-card">
         <div className="upload-grid">
           <div className="upload-col">
-            {processing ? (
+            {busy ? (
               <div className="processing-box">
                 <div className="spinner" />
                 <p className="processing-text">Analyzing your image…</p>
@@ -107,7 +138,7 @@ export const Upload: React.FC = () => {
                 onDrop={(e) => {
                   e.preventDefault()
                   setDragging(false)
-                  accept(e.dataTransfer.files[0])
+                  void accept(e.dataTransfer.files)
                 }}
               >
                 {preview ? (
@@ -115,7 +146,7 @@ export const Upload: React.FC = () => {
                 ) : (
                   <>
                     <p className="drop-zone-text">Drop your image here</p>
-                    <p className="drop-zone-hint">or click to browse — JPG, PNG or WEBP</p>
+                    <p className="drop-zone-hint">or click to browse — JPG, JPEG, PNG or WEBP (max 10 MB)</p>
                   </>
                 )}
               </div>
@@ -124,24 +155,26 @@ export const Upload: React.FC = () => {
             <input
               ref={inputRef}
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               hidden
-              onChange={(e) => accept(e.target.files?.[0])}
+              onChange={(e) => {
+                void accept(e.target.files)
+              }}
             />
 
             <div className="upload-steps">
-              <StepIndicator step={processing ? 2 : 1} />
+              <StepIndicator step={busy ? 2 : 1} />
             </div>
 
             {error && <p className="upload-error">{error}</p>}
 
             <div className="upload-actions">
-              <button className="btn" onClick={analyze} disabled={!file || processing}>
-                {processing ? 'Analyzing…' : 'Analyze image'}
+              <button className="btn" onClick={() => void analyze()} disabled={!file || busy}>
+                {busy ? 'Analyzing…' : 'Analyze image'}
               </button>
-              {file && !processing && (
+              {!busy && (
                 <button className="btn-ghost" onClick={clear}>
-                  Clear
+                  {file ? 'Clear' : 'Choose another image'}
                 </button>
               )}
             </div>

@@ -43,10 +43,11 @@ export const HISTORY_SEED: AnalysisResult[] = [
   },
 ]
 export const TIPS = [
+  'Upload one image at a time — JPG, JPEG, PNG, or WEBP only.',
+  'Keep files under 10 MB so analysis can start right away.',
   'Clear, well lit images usually work best.',
-  'Make sure your file is in a supported image format.',
   'Your image is processed securely and removed after analysis.',
   'Analysis results are there to help you make a better judgment.',
 ]
 
-export const TIPS_LEAD = 'Please upload one image at a time.'
+export const TIPS_LEAD = 'Please upload one image at a time (JPG, JPEG, PNG, or WEBP under 10 MB).'

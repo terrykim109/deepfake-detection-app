@@ -70,6 +70,26 @@ export interface SessionConfig {
   timeout_minutes: number
 }
 
+export interface AnalysisUsage {
+  user_id: string
+  active: boolean
+  request_timestamps: string[]
+  count_24h: number
+  max_24h: number
+  remaining_24h: number
+}
+
+async function postForm<T>(path: string, form: FormData): Promise<ApiResponse<T>> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: form })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: errorMessage(data, res.status) }
+    return { data }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Network error' }
+  }
+}
+
 export const authApi = {
   signup: (email: string, password: string, displayName?: string) =>
     post<TokenResponse>('/api/auth/signup', { email, password, display_name: displayName }),
@@ -94,4 +114,28 @@ export const authApi = {
 
   updateProfile: (userId: string, profile: { first_name?: string; last_name?: string; email?: string; phone?: string }) =>
     put<UserResponse>(`/api/users/${userId}/profile`, profile),
+}
+
+export const analysisApi = {
+  usage: (userId: string) =>
+    get<AnalysisUsage>(`/api/analysis/usage?user_id=${encodeURIComponent(userId)}`),
+
+  validate: (userId: string, file: File) => {
+    const form = new FormData()
+    form.append('user_id', userId)
+    form.append('file', file)
+    return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/validate', form)
+  },
+
+  start: (userId: string) => {
+    const form = new FormData()
+    form.append('user_id', userId)
+    return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/start', form)
+  },
+
+  finish: (userId: string) => {
+    const form = new FormData()
+    form.append('user_id', userId)
+    return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/finish', form)
+  },
 }

@@ -7,6 +7,7 @@ import { CreateAccount } from './pages/CreateAccount'
 import { Profile } from './pages/Profile'
 import { Upload } from './pages/Upload'
 import { History } from './pages/History'
+import { Results } from './pages/Results'
 
 /* ─── Auth Guards ─── */
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -28,6 +29,7 @@ const AppRoutes: React.FC = () => (
     <Route path="/create-account" element={<RedirectIfAuth><CreateAccount /></RedirectIfAuth>} />
     <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
     <Route path="/upload" element={<RequireAuth><Upload /></RequireAuth>} />
+    <Route path="/results" element={<RequireAuth><Results /></RequireAuth>} />
     <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
     <Route path="/" element={<Navigate to="/profile" replace />} />
     <Route path="*" element={<Navigate to="/profile" replace />} />
