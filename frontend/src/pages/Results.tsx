@@ -4,22 +4,21 @@ import { AppShell } from '../components/AppShell'
 import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
 import { useAppState } from '../state/AppState'
-import { RESULT_PARAGRAPHS } from '../data/mock'
 
 /* Figma frame "Image Results" (node 3:4).
 
-   The frame has no way to save the result or start another run, so the
-   Save / Analyze another buttons below are additions in the design's
-   own button style. Saving reuses the "Saved Modal" (node 115:92). */
+   After analysis the original image is deleted (FR-12). This screen shows
+   the result only, plus an explicit privacy confirmation. */
 export const Results: React.FC = () => {
   const navigate = useNavigate()
-  const { currentResult, previewUrl, saveResult, isSaved, clearAnalysis } = useAppState()
+  const { currentResult, saveResult, isSaved, clearAnalysis } = useAppState()
   const [saved, setSaved] = useState(false)
   const alreadySaved = currentResult ? isSaved(currentResult.id) : false
 
   if (!currentResult) return <Navigate to="/upload" replace />
 
   const save = () => {
+    // History stores the result metadata only — never the original image
     saveResult(currentResult)
     setSaved(true)
   }
@@ -29,28 +28,41 @@ export const Results: React.FC = () => {
     navigate('/upload')
   }
 
+  const privacyText =
+    currentResult.privacyMessage ||
+    'Your original image has been deleted from our servers. Only this analysis result was kept.'
+
   return (
     <AppShell>
       <section className="panel results-card">
-        <div className="result-thumb">
-          {previewUrl ? (
-            <img className="shot" src={previewUrl} alt={currentResult.fileName} />
-          ) : (
-            <img className="icon" src="/assets/icon-image.svg" alt="" />
-          )}
+        <div className="result-thumb result-thumb--cleared" aria-hidden="true">
+          <img className="icon" src="/assets/icon-image.svg" alt="" />
+          <p className="result-thumb-note">Original image removed</p>
         </div>
 
         <div className="result-body">
           <div className="result-text">
-            {RESULT_PARAGRAPHS.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
+            <p>{currentResult.summary}</p>
           </div>
-
           <div className="score">
             <span>{currentResult.confidence}</span>
           </div>
         </div>
+
+        <p className="privacy-note" role="status">
+          {privacyText}
+          {currentResult.imageDeletedAt ? (
+            <>
+              {' '}
+              <span className="privacy-meta">
+                Deleted at {new Date(currentResult.imageDeletedAt).toLocaleString()}
+                {currentResult.imageStoredAt
+                  ? ` · stored at ${new Date(currentResult.imageStoredAt).toLocaleString()}`
+                  : ''}
+              </span>
+            </>
+          ) : null}
+        </p>
 
         <div className="results-steps">
           <StepIndicator step={3} />
@@ -69,7 +81,7 @@ export const Results: React.FC = () => {
       {saved && (
         <Modal
           title="Results Saved"
-          subtitle={'Results can be viewed in the “History” Page'}
+          subtitle={'Results can be viewed in the “History” Page. The original image was not saved.'}
           onClose={() => setSaved(false)}
         />
       )}

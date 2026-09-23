@@ -15,6 +15,7 @@ type AppStateValue = AuthState & AuthActions & {
   sortedHistory: AnalysisResult[]
   deleteResult: (id: string) => void
   currentResult: AnalysisResult | null
+  /** Cleared after analysis — original image is never kept for history. */
   previewUrl: string | null
   analyzing: boolean
   runAnalysis: (file: File, preview: string | null, signal?: AbortSignal) => Promise<void>
@@ -33,6 +34,47 @@ function formatTimestamp(d = new Date()): string {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+function revokePreview(preview: string | null) {
+  if (!preview) return
+  try {
+    URL.revokeObjectURL(preview)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** History may store the verdict only — never an image URL or bytes. */
+function toHistorySafe(result: AnalysisResult): AnalysisResult {
+  const {
+    id,
+    fileName,
+    timestamp,
+    createdAt,
+    verdict,
+    verdictLabel,
+    confidence,
+    summary,
+    imageDeleted,
+    imageStoredAt,
+    imageDeletedAt,
+    privacyMessage,
+  } = result
+  return {
+    id,
+    fileName,
+    timestamp,
+    createdAt,
+    verdict,
+    verdictLabel,
+    confidence,
+    summary,
+    imageDeleted: imageDeleted ?? true,
+    imageStoredAt: imageStoredAt ?? null,
+    imageDeletedAt: imageDeletedAt ?? null,
+    privacyMessage,
+  }
 }
 
 export const AppStateProvider: React.FC<{
@@ -60,7 +102,8 @@ export const AppStateProvider: React.FC<{
   }, [])
 
   const saveResult = useCallback((result: AnalysisResult) => {
-    setHistory((rows) => (rows.some((r) => r.id === result.id) ? rows : [result, ...rows]))
+    const safe = toHistorySafe(result)
+    setHistory((rows) => (rows.some((r) => r.id === safe.id) ? rows : [safe, ...rows]))
   }, [])
 
   const isSaved = useCallback(
@@ -79,7 +122,6 @@ export const AppStateProvider: React.FC<{
         )
       }
 
-      // Client-side validation first (reject before provider/network when possible)
       const local = await validateUploadSelection([file])
       if (!local.ok) throw new Error(local.message)
 
@@ -88,30 +130,86 @@ export const AppStateProvider: React.FC<{
       const validated = await analysisApi.validate(userId, file)
       if (validated.error) throw new Error(validated.error)
 
-      const started = await analysisApi.start(userId)
-      if (started.error) throw new Error(started.error)
+      const started = await analysisApi.start(userId, file)
+      if (started.error || !started.data?.image?.image_id) {
+        throw new Error(
+          started.error ||
+            'We could not store your image for analysis. Nothing was kept — please try uploading again.',
+        )
+      }
 
+      const imageId = started.data.image.image_id
+      let settled = false
       analyzingRef.current = true
       setAnalyzing(true)
 
+      const settle = async (outcome: 'success' | 'failure' | 'cancelled') => {
+        if (settled) return null
+        settled = true
+        return analysisApi.finish(userId, imageId, outcome)
+      }
+
       try {
+        if (signal?.aborted) {
+          throw new DOMException('Analysis aborted', 'AbortError')
+        }
+
         const detection = await detector.analyze(file, signal)
-        if (signal?.aborted) throw new DOMException('Analysis aborted', 'AbortError')
+        if (signal?.aborted) {
+          throw new DOMException('Analysis aborted', 'AbortError')
+        }
+
+        const finished = await settle('success')
+        if (finished?.error) {
+          throw new Error(
+            finished.error ||
+              'Analysis finished but we could not confirm image deletion. Please try again.',
+          )
+        }
+
+        revokePreview(preview)
+        setPreviewUrl(null)
 
         const now = new Date()
+        const privacy = finished?.data?.privacy
         const result: AnalysisResult = {
           ...detection,
           id: `r_${now.getTime()}`,
           fileName: file.name,
           timestamp: formatTimestamp(now),
           createdAt: now.toISOString(),
+          imageDeleted: true,
+          imageStoredAt: privacy?.stored_at ?? started.data.image.stored_at ?? null,
+          imageDeletedAt: privacy?.deleted_at ?? null,
+          privacyMessage:
+            privacy?.message ||
+            'Your original image has been deleted from our servers. Only this analysis result was kept.',
         }
         setCurrentResult(result)
-        setPreviewUrl(preview)
+      } catch (err) {
+        const aborted =
+          (err instanceof DOMException && err.name === 'AbortError') || Boolean(signal?.aborted)
+        await settle(aborted ? 'cancelled' : 'failure')
+
+        revokePreview(preview)
+        setPreviewUrl(null)
+
+        if (aborted) throw err
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Analysis could not be completed. Your image was deleted — please try uploading again.'
+        throw new Error(
+          /network|fetch|failed to fetch/i.test(message)
+            ? 'The analysis service is unavailable right now. Your image was not kept — please try uploading again when the service is available.'
+            : message.includes('deleted')
+              ? message
+              : `${message} Your original image has been deleted. You can upload again.`,
+        )
       } finally {
         analyzingRef.current = false
         setAnalyzing(false)
-        await analysisApi.finish(userId)
       }
     },
     [authState.user, authState.loading, detector],
