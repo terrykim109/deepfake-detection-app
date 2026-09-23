@@ -5,6 +5,11 @@ export interface AnalysisResult extends Detection {
   fileName: string
   timestamp: string
   createdAt: string
+  /** Privacy metadata — original image is never stored with history. */
+  imageDeleted?: boolean
+  imageStoredAt?: string | null
+  imageDeletedAt?: string | null
+  privacyMessage?: string
 }
 
 export const DETAIL_SUMMARY =
@@ -45,8 +50,8 @@ export const HISTORY_SEED: AnalysisResult[] = [
 export const TIPS = [
   'Upload one image at a time — JPG, JPEG, PNG, or WEBP only.',
   'Keep files under 10 MB so analysis can start right away.',
-  'Clear, well lit images usually work best.',
-  'Your image is processed securely and removed after analysis.',
+  'Your image is stored only temporarily and deleted within 60 seconds after analysis.',
+  'Saved history keeps the result only — never the original image.',
   'Analysis results are there to help you make a better judgment.',
 ]
 

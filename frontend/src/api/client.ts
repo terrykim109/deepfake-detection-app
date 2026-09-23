@@ -79,6 +79,44 @@ export interface AnalysisUsage {
   remaining_24h: number
 }
 
+export interface TempImageInfo {
+  image_id: string
+  filename?: string
+  size?: number
+  stored_at?: string | null
+  delete_by?: string
+  deleted_at?: string | null
+  delete_reason?: string
+  lifetime_seconds?: number | null
+  deleted?: boolean
+  max_retention_seconds?: number
+}
+
+export interface AnalysisPrivacy {
+  temporary_only?: boolean
+  image_deleted?: boolean
+  message: string
+  stored_at?: string | null
+  deleted_at?: string | null
+  lifetime_seconds?: number | null
+  max_retention_seconds?: number
+}
+
+export interface AnalysisStartResponse {
+  ok: boolean
+  usage: AnalysisUsage
+  image: TempImageInfo
+  privacy: AnalysisPrivacy
+}
+
+export interface AnalysisFinishResponse {
+  ok: boolean
+  outcome: 'success' | 'failure' | 'cancelled'
+  usage: AnalysisUsage
+  image: TempImageInfo
+  privacy: AnalysisPrivacy
+}
+
 async function postForm<T>(path: string, form: FormData): Promise<ApiResponse<T>> {
   try {
     const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: form })
@@ -127,15 +165,20 @@ export const analysisApi = {
     return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/validate', form)
   },
 
-  start: (userId: string) => {
+  /** Stores the image temporarily and starts the analysis slot. */
+  start: (userId: string, file: File) => {
     const form = new FormData()
     form.append('user_id', userId)
-    return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/start', form)
+    form.append('file', file)
+    return postForm<AnalysisStartResponse>('/api/analysis/start', form)
   },
 
-  finish: (userId: string) => {
+  /** Deletes the temp image (success, failure, or cancel) and frees the slot. */
+  finish: (userId: string, imageId: string, outcome: 'success' | 'failure' | 'cancelled') => {
     const form = new FormData()
     form.append('user_id', userId)
-    return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/finish', form)
+    form.append('image_id', imageId)
+    form.append('outcome', outcome)
+    return postForm<AnalysisFinishResponse>('/api/analysis/finish', form)
   },
 }

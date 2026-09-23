@@ -102,12 +102,18 @@ export const Upload: React.FC = () => {
 
       await runAnalysis(file, preview, controller.signal)
       handedOff.current = true
+      // Local preview was revoked after server-side deletion — clear picker state
+      setFile(null)
+      setPreviewUrl(null)
+      if (inputRef.current) inputRef.current.value = ''
       navigate('/results')
     } catch (err) {
       if (controller.signal.aborted) return
       setProcessing(false)
       setError(err instanceof Error ? err.message : 'Analysis failed. Please try again with another image.')
-      // Keep Clear / file picker available so the user can re-upload
+      // Re-upload path after failure/cancellation — image is not retained
+      setFile(null)
+      setPreviewUrl(null)
       if (inputRef.current) inputRef.current.value = ''
     }
   }

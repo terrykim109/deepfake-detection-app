@@ -5,6 +5,7 @@ backend/serviceAccountKey.json
 backend/venv/
 backend/__pycache__/
 backend/*.pyc
+backend/tmp_uploads/
 
 .env
 .env.local
