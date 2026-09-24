@@ -117,13 +117,35 @@ export interface AnalysisFinishResponse {
   privacy: AnalysisPrivacy
 }
 
-async function postForm<T>(path: string, form: FormData): Promise<ApiResponse<T>> {
+export interface AnalysisRunResultPayload {
+  id: string
+  verdict: string
+  verdict_label: string
+  confidence: number
+  summary: string
+  file_name: string
+  created_at: string
+  provider?: string
+}
+
+export interface AnalysisRunResponse {
+  ok: boolean
+  status: string
+  result?: AnalysisRunResultPayload
+  image?: TempImageInfo
+  privacy?: AnalysisPrivacy
+  usage?: AnalysisUsage
+  provider?: string
+}
+
+async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<ApiResponse<T>> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: form })
+    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: form, signal })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { error: errorMessage(data, res.status) }
     return { data }
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
     return { error: err instanceof Error ? err.message : 'Network error' }
   }
 }
@@ -162,7 +184,15 @@ export const analysisApi = {
     const form = new FormData()
     form.append('user_id', userId)
     form.append('file', file)
-    return postForm<{ ok: boolean; usage: AnalysisUsage }>('/api/analysis/validate', form)
+    return postForm<{ ok: boolean; status?: string; usage: AnalysisUsage }>('/api/analysis/validate', form)
+  },
+
+  /** Full DFD-02 path: validate → temp store → detect → delete → result */
+  run: (userId: string, file: File, signal?: AbortSignal) => {
+    const form = new FormData()
+    form.append('user_id', userId)
+    form.append('file', file)
+    return postForm<AnalysisRunResponse>('/api/analysis/run', form, signal)
   },
 
   /** Stores the image temporarily and starts the analysis slot. */

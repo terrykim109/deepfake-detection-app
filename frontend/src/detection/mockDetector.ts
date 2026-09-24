@@ -15,20 +15,24 @@ const FIXED: Detection = {
 const LATENCY_MS = 1600
 
 export const mockDetector: Detector = {
-  analyze: (_file, signal) =>
+  analyze: (_file, signal, onStatus) =>
     new Promise<Detection>((resolve, reject) => {
       if (signal?.aborted) {
         reject(abortError())
         return
       }
 
+      onStatus?.('analyzing')
+
       const timer = setTimeout(() => {
         signal?.removeEventListener('abort', onAbort)
+        onStatus?.('completed')
         resolve(FIXED)
       }, LATENCY_MS)
 
       function onAbort() {
         clearTimeout(timer)
+        onStatus?.('failed')
         reject(abortError())
       }
 

@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import { useAuth, type AuthState, type AuthActions } from './useAuth'
 import { HISTORY_SEED, type AnalysisResult } from '../data/mock'
-import { mockDetector } from '../detection/mockDetector'
-import type { Detector } from '../detection/detector'
-import { analysisApi } from '../api/client'
+import { createHttpDetector } from '../detection/httpDetector'
+import type { AnalysisStage, Detector } from '../detection/detector'
+import { ANALYSIS_STAGE_LABELS } from '../detection/detector'
 import { validateUploadSelection } from '../upload/validateUpload'
 
 export type SortOrder = 'newest' | 'oldest'
@@ -15,9 +15,10 @@ type AppStateValue = AuthState & AuthActions & {
   sortedHistory: AnalysisResult[]
   deleteResult: (id: string) => void
   currentResult: AnalysisResult | null
-  /** Cleared after analysis — original image is never kept for history. */
   previewUrl: string | null
   analyzing: boolean
+  analysisStage: AnalysisStage
+  analysisStageLabel: string
   runAnalysis: (file: File, preview: string | null, signal?: AbortSignal) => Promise<void>
   saveResult: (result: AnalysisResult) => void
   isSaved: (id: string) => boolean
@@ -45,7 +46,6 @@ function revokePreview(preview: string | null) {
   }
 }
 
-/** History may store the verdict only — never an image URL or bytes. */
 function toHistorySafe(result: AnalysisResult): AnalysisResult {
   const {
     id,
@@ -80,13 +80,22 @@ function toHistorySafe(result: AnalysisResult): AnalysisResult {
 export const AppStateProvider: React.FC<{
   children: React.ReactNode
   detector?: Detector
-}> = ({ children, detector = mockDetector }) => {
+}> = ({ children, detector }) => {
   const authState = useAuth()
+  const userIdRef = useRef<string | null>(null)
+  userIdRef.current = authState.user?.user_id ?? null
+
+  const activeDetector = useMemo(
+    () => detector ?? createHttpDetector(() => userIdRef.current),
+    [detector],
+  )
+
   const [history, setHistory] = useState<AnalysisResult[]>(HISTORY_SEED)
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest')
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle')
   const analyzingRef = useRef(false)
 
   const sortedHistory = useMemo(() => {
@@ -99,6 +108,7 @@ export const AppStateProvider: React.FC<{
   const clearAnalysis = useCallback(() => {
     setCurrentResult(null)
     setPreviewUrl(null)
+    setAnalysisStage('idle')
   }, [])
 
   const saveResult = useCallback((result: AnalysisResult) => {
@@ -125,94 +135,56 @@ export const AppStateProvider: React.FC<{
       const local = await validateUploadSelection([file])
       if (!local.ok) throw new Error(local.message)
 
-      const userId = authState.user.user_id
-
-      const validated = await analysisApi.validate(userId, file)
-      if (validated.error) throw new Error(validated.error)
-
-      const started = await analysisApi.start(userId, file)
-      if (started.error || !started.data?.image?.image_id) {
-        throw new Error(
-          started.error ||
-            'We could not store your image for analysis. Nothing was kept — please try uploading again.',
-        )
-      }
-
-      const imageId = started.data.image.image_id
-      let settled = false
       analyzingRef.current = true
       setAnalyzing(true)
-
-      const settle = async (outcome: 'success' | 'failure' | 'cancelled') => {
-        if (settled) return null
-        settled = true
-        return analysisApi.finish(userId, imageId, outcome)
-      }
+      setAnalysisStage('validating')
 
       try {
-        if (signal?.aborted) {
-          throw new DOMException('Analysis aborted', 'AbortError')
-        }
-
-        const detection = await detector.analyze(file, signal)
-        if (signal?.aborted) {
-          throw new DOMException('Analysis aborted', 'AbortError')
-        }
-
-        const finished = await settle('success')
-        if (finished?.error) {
-          throw new Error(
-            finished.error ||
-              'Analysis finished but we could not confirm image deletion. Please try again.',
-          )
-        }
+        const detection = await activeDetector.analyze(file, signal, setAnalysisStage)
+        if (signal?.aborted) throw new DOMException('Analysis aborted', 'AbortError')
 
         revokePreview(preview)
         setPreviewUrl(null)
 
         const now = new Date()
-        const privacy = finished?.data?.privacy
         const result: AnalysisResult = {
-          ...detection,
-          id: `r_${now.getTime()}`,
+          verdict: detection.verdict,
+          verdictLabel: detection.verdictLabel,
+          confidence: detection.confidence,
+          summary: detection.summary,
+          id: detection.id || `r_${now.getTime()}`,
           fileName: file.name,
           timestamp: formatTimestamp(now),
-          createdAt: now.toISOString(),
-          imageDeleted: true,
-          imageStoredAt: privacy?.stored_at ?? started.data.image.stored_at ?? null,
-          imageDeletedAt: privacy?.deleted_at ?? null,
+          createdAt: detection.createdAt || now.toISOString(),
+          imageDeleted: detection.imageDeleted ?? true,
+          imageStoredAt: detection.imageStoredAt ?? null,
+          imageDeletedAt: detection.imageDeletedAt ?? null,
           privacyMessage:
-            privacy?.message ||
+            detection.privacyMessage ||
             'Your original image has been deleted from our servers. Only this analysis result was kept.',
         }
         setCurrentResult(result)
+        setAnalysisStage('completed')
       } catch (err) {
-        const aborted =
-          (err instanceof DOMException && err.name === 'AbortError') || Boolean(signal?.aborted)
-        await settle(aborted ? 'cancelled' : 'failure')
-
+        setAnalysisStage('failed')
         revokePreview(preview)
         setPreviewUrl(null)
 
+        const aborted =
+          (err instanceof DOMException && err.name === 'AbortError') || Boolean(signal?.aborted)
         if (aborted) throw err
 
         const message =
           err instanceof Error
             ? err.message
-            : 'Analysis could not be completed. Your image was deleted — please try uploading again.'
-        throw new Error(
-          /network|fetch|failed to fetch/i.test(message)
-            ? 'The analysis service is unavailable right now. Your image was not kept — please try uploading again when the service is available.'
-            : message.includes('deleted')
-              ? message
-              : `${message} Your original image has been deleted. You can upload again.`,
-        )
+            : 'Analysis could not be completed. Please try uploading again.'
+        throw new Error(message)
       } finally {
         analyzingRef.current = false
         setAnalyzing(false)
       }
     },
-    [authState.user, authState.loading, detector],
+    [authState.user, authState.loading, activeDetector],
   )
 
   return (
@@ -227,6 +199,8 @@ export const AppStateProvider: React.FC<{
         currentResult,
         previewUrl,
         analyzing,
+        analysisStage,
+        analysisStageLabel: ANALYSIS_STAGE_LABELS[analysisStage],
         runAnalysis,
         saveResult,
         isSaved,

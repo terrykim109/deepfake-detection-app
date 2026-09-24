@@ -8,12 +8,11 @@ import { validateUploadSelection } from '../upload/validateUpload'
 
 /* Figma frame "Image Upload" (node 20:12).
 
-   The frame shows the step tracker but has no control that moves you
-   from step 1 to step 2, so the Analyze / Clear buttons below are an
-   addition, styled with the design's own button treatment. */
+   Analyze posts to the backend /api/analysis/run path (DFD-02) and
+   surfaces connecting / processing / analyzing status while it runs. */
 export const Upload: React.FC = () => {
   const navigate = useNavigate()
-  const { runAnalysis, analyzing, user } = useAppState()
+  const { runAnalysis, analyzing, analysisStage, analysisStageLabel, user } = useAppState()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [file, setFile] = useState<File | null>(null)
@@ -22,8 +21,6 @@ export const Upload: React.FC = () => {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const abortRef = useRef<AbortController | null>(null)
-  /* Blob-URL bookkeeping: previewRef mirrors `preview` for the unmount
-     cleanup, handedOff marks the URL as now owned by app state. */
   const previewRef = useRef<string | null>(null)
   const handedOff = useRef(false)
 
@@ -56,7 +53,6 @@ export const Upload: React.FC = () => {
     setError('')
     const result = await validateUploadSelection(files)
     if (!result.ok) {
-      // Keep a clear re-upload path: drop rejected file, show how to fix
       setFile(null)
       setPreviewUrl(null)
       if (inputRef.current) inputRef.current.value = ''
@@ -92,7 +88,6 @@ export const Upload: React.FC = () => {
     abortRef.current = controller
 
     try {
-      // Re-validate immediately before submission
       const recheck = await validateUploadSelection([file])
       if (!recheck.ok) {
         setProcessing(false)
@@ -102,7 +97,6 @@ export const Upload: React.FC = () => {
 
       await runAnalysis(file, preview, controller.signal)
       handedOff.current = true
-      // Local preview was revoked after server-side deletion — clear picker state
       setFile(null)
       setPreviewUrl(null)
       if (inputRef.current) inputRef.current.value = ''
@@ -111,7 +105,6 @@ export const Upload: React.FC = () => {
       if (controller.signal.aborted) return
       setProcessing(false)
       setError(err instanceof Error ? err.message : 'Analysis failed. Please try again with another image.')
-      // Re-upload path after failure/cancellation — image is not retained
       setFile(null)
       setPreviewUrl(null)
       if (inputRef.current) inputRef.current.value = ''
@@ -119,6 +112,9 @@ export const Upload: React.FC = () => {
   }
 
   const busy = processing || analyzing
+  const statusText =
+    analysisStageLabel ||
+    (busy ? 'Analyzing your image…' : '')
 
   return (
     <AppShell>
@@ -130,7 +126,12 @@ export const Upload: React.FC = () => {
             {busy ? (
               <div className="processing-box">
                 <div className="spinner" />
-                <p className="processing-text">Analyzing your image…</p>
+                <p className="processing-text">{statusText}</p>
+                {analysisStage !== 'idle' && analysisStage !== 'completed' && (
+                  <p className="processing-stage" aria-live="polite">
+                    Status: {analysisStage}
+                  </p>
+                )}
               </div>
             ) : (
               <div
@@ -176,7 +177,7 @@ export const Upload: React.FC = () => {
 
             <div className="upload-actions">
               <button className="btn" onClick={() => void analyze()} disabled={!file || busy}>
-                {busy ? 'Analyzing…' : 'Analyze image'}
+                {busy ? 'Working…' : 'Analyze image'}
               </button>
               {!busy && (
                 <button className="btn-ghost" onClick={clear}>
