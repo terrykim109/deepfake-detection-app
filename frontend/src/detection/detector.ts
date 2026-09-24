@@ -1,37 +1,54 @@
 /* The seam between the app and whatever performs deepfake detection.
-   Today the only adapter is the mock (see mockDetector.ts); the HTTP
-   adapter that calls the backend drops in beside it without any page
-   or state change. */
+   httpDetector calls the backend /api/analysis/run path (DFD-02).
+   mockDetector remains for offline UI work. */
 
 export type Verdict = 'real' | 'warn' | 'fake'
 
-/* What a detector reports about one image.
+export type AnalysisStage =
+  | 'idle'
+  | 'validating'
+  | 'connecting'
+  | 'processing'
+  | 'analyzing'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
 
-   Deliberately does NOT carry id, fileName or timestamps: those are
-   app-side identity and are stamped by the caller when the run is
-   committed. A detector never mints them. */
+export const ANALYSIS_STAGE_LABELS: Record<AnalysisStage, string> = {
+  idle: '',
+  validating: 'Checking your image…',
+  connecting: 'Connecting to analysis service…',
+  processing: 'Preparing a secure temporary copy…',
+  analyzing: 'Analyzing your image…',
+  finalizing: 'Removing the temporary image…',
+  completed: 'Analysis complete',
+  failed: 'Analysis could not be completed',
+}
+
 export interface Detection {
   verdict: Verdict
-  /** Human wording for the verdict, e.g. "Likely manipulated". */
   verdictLabel: string
-  /** 0–100. */
   confidence: number
   summary: string
+  /** Optional server-issued id / privacy fields from /analysis/run */
+  id?: string
+  provider?: string
+  imageDeleted?: boolean
+  imageStoredAt?: string | null
+  imageDeletedAt?: string | null
+  privacyMessage?: string
+  createdAt?: string
 }
 
-/* Contract every adapter must honour:
+export type StatusCallback = (stage: AnalysisStage) => void
 
-   - resolves with a Detection, or rejects with an Error whose `message`
-     is safe to show the user;
-   - rejects with an AbortError (DOMException) if `signal` aborts, and
-     performs no further work after that;
-   - may take seconds, so callers must render a pending state.
-
-   The backend endpoint is expected to satisfy this shape. */
 export interface Detector {
-  analyze(file: File, signal?: AbortSignal): Promise<Detection>
+  analyze(
+    file: File,
+    signal?: AbortSignal,
+    onStatus?: StatusCallback,
+  ): Promise<Detection>
 }
 
-/** Matches what `fetch` rejects with, so both adapters abort alike. */
 export const abortError = (): DOMException =>
   new DOMException('Analysis aborted', 'AbortError')

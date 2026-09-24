@@ -417,6 +417,13 @@ input { font-family: inherit; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .processing-text { font-size: 32px; font-weight: 200; color: #000; }
+.processing-stage {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--secondary-text);
+  text-transform: capitalize;
+}
 
 /* ───────────── Results ───────────── */
 .results-card { margin: 21px 64px 0; height: 731px; position: relative; }
