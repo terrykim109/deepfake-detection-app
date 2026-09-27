@@ -28,7 +28,7 @@ export const Login: React.FC = () => {
     const reason = consumeSessionExpired();
     if (reason === "inactivity") {
       setSessionNote(
-        `Your session ended after ${sessionTimeoutMinutes} minutes of inactivity. Please log in again.`,
+        `You have been logged out due to inactivity. Please sign in again to continue.`,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
