@@ -6,7 +6,7 @@ from typing import Any
 # User creation schema
 class UserCreate(BaseModel):
     email: str 
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=12)
     display_name: str | None = None
 
 # User login schema
