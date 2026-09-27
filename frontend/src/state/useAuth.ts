@@ -277,9 +277,7 @@ export function useAuth(): AuthState & AuthActions {
           password,
         );
         if (!credential.user.emailVerified) {
-          throw new Error(
-            "Please verify your email before logging in. Check your inbox for the verification link.",
-          );
+          throw new Error("Please verify your email inbox to continue.");
         }
         const idToken = await credential.user.getIdToken();
         const createdAt = credential.user.metadata.creationTime
