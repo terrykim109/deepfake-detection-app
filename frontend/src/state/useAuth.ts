@@ -1,161 +1,208 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from "react";
 import {
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   updateProfile as updateFirebaseProfile,
-} from 'firebase/auth'
-import { authApi, type UserResponse } from '../api/client'
-import { auth } from '../firebase'
+} from "firebase/auth";
+import { authApi, type UserResponse } from "../api/client";
+import { auth } from "../firebase";
 import {
   clearLastActivity,
   useInactivityTimeout,
   writeLastActivity,
-} from './useInactivityTimeout'
+} from "./useInactivityTimeout";
 
-const TOKEN_KEY = 'dfd.token'
-const USER_KEY = 'dfd.user'
-const DEFAULT_TIMEOUT_MINUTES = 30
+const TOKEN_KEY = "dfd.token";
+const USER_KEY = "dfd.user";
+const DEFAULT_TIMEOUT_MINUTES = 30;
 
 function loadStored(): { token: string | null; user: UserResponse | null } {
   try {
-    const token = sessionStorage.getItem(TOKEN_KEY)
-    const userRaw = sessionStorage.getItem(USER_KEY)
-    const user = userRaw ? JSON.parse(userRaw) : null
-    return { token, user }
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    const userRaw = sessionStorage.getItem(USER_KEY);
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    return { token, user };
   } catch {
-    return { token: null, user: null }
+    return { token: null, user: null };
   }
 }
 
 function saveStored(token: string, user: UserResponse) {
-  sessionStorage.setItem(TOKEN_KEY, token)
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user))
-  writeLastActivity()
+  sessionStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  writeLastActivity();
 }
 
 function clearStored() {
-  sessionStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(USER_KEY)
-  clearLastActivity()
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+  clearLastActivity();
 }
 
 /* Map a Firebase Auth error code to a user-facing message */
 function firebaseAuthErrorMessage(err: unknown): string {
-  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
+  const code =
+    err && typeof err === "object" && "code" in err
+      ? String((err as { code: unknown }).code)
+      : "";
   switch (code) {
-    case 'auth/email-already-in-use':
-      return 'An account with this email already exists. Please log in instead.'
-    case 'auth/weak-password':
-      return 'Password should be at least 6 characters.'
-    case 'auth/invalid-email':
-      return 'Please enter a valid email address.'
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
-      return 'Invalid email or password. Please try again.'
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait a moment and try again.'
+    case "auth/email-already-in-use":
+      return "An account with this email already exists. Please log in instead.";
+    case "auth/weak-password":
+    case "auth/password-does-not-meet-requirements":
+      return "Password must be at least 12 characters and include an uppercase letter, a lowercase letter, a number, and a special character.";
+    case "auth/invalid-email":
+      return "Please enter a valid email address.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+      return "Invalid email or password. Please try again.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a moment and try again.";
     default:
-      return err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+      return err instanceof Error
+        ? err.message
+        : "Something went wrong. Please try again.";
   }
 }
 
 export interface Profile {
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
 }
 
 export interface AuthState {
-  user: UserResponse | null
-  token: string | null
-  profile: Profile
-  loading: boolean
-  saving: boolean
-  error: string
-  sessionTimeoutMinutes: number
+  user: UserResponse | null;
+  token: string | null;
+  profile: Profile;
+  loading: boolean;
+  saving: boolean;
+  error: string;
+  sessionTimeoutMinutes: number;
 }
 
 export interface AuthActions {
-  signUp: (email: string, password: string, displayName?: string) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
-  signOut: (opts?: { reason?: 'manual' | 'inactivity' }) => Promise<void>
-  updateProfile: (next: Profile) => Promise<void>
-  clearError: () => void
+  signUp: (
+    email: string,
+    password: string,
+    displayName?: string,
+  ) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: (opts?: { reason?: "manual" | "inactivity" }) => Promise<void>;
+  updateProfile: (next: Profile) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
+  clearError: () => void;
 }
 
 function emptyProfile(): Profile {
-  return { firstName: '', lastName: '', email: '', phone: '' }
+  return { firstName: "", lastName: "", email: "", phone: "" };
 }
 
 function buildProfile(user: UserResponse | null): Profile {
-  if (!user) return emptyProfile()
-  const names = (user.display_name || '').split(' ')
+  if (!user) return emptyProfile();
+  const names = (user.display_name || "").split(" ");
   return {
-    firstName: user.first_name || names[0] || '',
-    lastName: user.last_name || names.slice(1).join(' ') || '',
-    email: user.email || '',
-    phone: user.phone || '',
-  }
+    firstName: user.first_name || names[0] || "",
+    lastName: user.last_name || names.slice(1).join(" ") || "",
+    email: user.email || "",
+    phone: user.phone || "",
+  };
 }
 
-function applyUser(user: UserResponse, fallback?: Profile | UserResponse | null): UserResponse {
-  const fb = fallback && 'firstName' in fallback
-    ? fallback
-    : fallback
-      ? buildProfile(fallback)
-      : emptyProfile()
+function applyUser(
+  user: UserResponse,
+  fallback?: Profile | UserResponse | null,
+): UserResponse {
+  const fb =
+    fallback && "firstName" in fallback
+      ? fallback
+      : fallback
+        ? buildProfile(fallback)
+        : emptyProfile();
   return {
     ...user,
-    email: user.email || fb.email || '',
-    first_name: user.first_name || fb.firstName || '',
-    last_name: user.last_name || fb.lastName || '',
-    phone: user.phone || fb.phone || '',
-  }
+    email: user.email || fb.email || "",
+    first_name: user.first_name || fb.firstName || "",
+    last_name: user.last_name || fb.lastName || "",
+    phone: user.phone || fb.phone || "",
+  };
 }
 
 export function useAuth(): AuthState & AuthActions {
-  const stored = loadStored()
-  const [user, setUser] = useState<UserResponse | null>(stored.user)
-  const [token, setToken] = useState<string | null>(stored.token)
-  const [profile, setProfile] = useState<Profile>(buildProfile(stored.user))
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(DEFAULT_TIMEOUT_MINUTES)
+  const stored = loadStored();
+  const [user, setUser] = useState<UserResponse | null>(stored.user);
+  const [token, setToken] = useState<string | null>(stored.token);
+  const [profile, setProfile] = useState<Profile>(buildProfile(stored.user));
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(
+    DEFAULT_TIMEOUT_MINUTES,
+  );
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     authApi.sessionConfig().then((res) => {
-      if (cancelled || !res.data?.timeout_minutes) return
-      setSessionTimeoutMinutes(res.data.timeout_minutes)
-    })
+      if (cancelled || !res.data?.timeout_minutes) return;
+      setSessionTimeoutMinutes(res.data.timeout_minutes);
+    });
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
-    const storedUser = stored.user
-    const storedToken = stored.token
-    if (!storedUser?.user_id || !storedToken) return
+    const storedUser = stored.user;
+    const storedToken = stored.token;
+    if (!storedUser?.user_id || !storedToken) return;
 
-    let cancelled = false
+    let cancelled = false;
     authApi.me(storedUser.user_id).then((res) => {
-      if (cancelled || !res.data) return
-      const nextUser = applyUser(res.data, storedUser)
-      saveStored(storedToken, nextUser)
-      setToken(storedToken)
-      setUser(nextUser)
-      setProfile(buildProfile(nextUser))
-    })
+      if (cancelled || !res.data) return;
+      const nextUser = applyUser(res.data, storedUser);
+      saveStored(storedToken, nextUser);
+      setToken(storedToken);
+      setUser(nextUser);
+      setProfile(buildProfile(nextUser));
+    });
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
-  const clearError = useCallback(() => setError(''), [])
+  const clearError = useCallback(() => setError(""), []);
+
+  // Sync Firebase user to BE, but do not allow users to continue session until email verification completed
+  const syncFirebaseUser = useCallback(
+    async (
+      uid: string,
+      email: string,
+      displayName: string | null | undefined,
+      createdAt: string,
+    ): Promise<UserResponse> => {
+      const localUser = applyUser({
+        id: uid,
+        user_id: uid,
+        email,
+        display_name: displayName,
+        auth_provider: "firebase",
+        created_at: createdAt,
+      });
+
+      const synced = await authApi.syncUser({
+        user_id: uid,
+        email,
+        display_name: displayName,
+        auth_provider: "firebase",
+      });
+
+      return applyUser(synced.data || localUser, localUser);
+    },
+    [],
+  );
 
   const persistFirebaseUser = useCallback(
     async (
@@ -165,125 +212,141 @@ export function useAuth(): AuthState & AuthActions {
       idToken: string,
       createdAt: string,
     ) => {
-      const localUser = applyUser({
-        id: uid,
-        user_id: uid,
+      const nextUser = await syncFirebaseUser(
+        uid,
         email,
-        display_name: displayName,
-        auth_provider: 'firebase',
-        created_at: createdAt,
-      })
-
-      const synced = await authApi.syncUser({
-        user_id: uid,
-        email,
-        display_name: displayName,
-        auth_provider: 'firebase',
-      })
-
-      const nextUser = applyUser(synced.data || localUser, localUser)
-      saveStored(idToken, nextUser)
-      setToken(idToken)
-      setUser(nextUser)
-      setProfile(buildProfile(nextUser))
+        displayName,
+        createdAt,
+      );
+      saveStored(idToken, nextUser);
+      setToken(idToken);
+      setUser(nextUser);
+      setProfile(buildProfile(nextUser));
     },
-    [],
-  )
+    [syncFirebaseUser],
+  );
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
-    setLoading(true)
-    setError('')
-    try {
-      const credential = await createUserWithEmailAndPassword(auth, email, password)
-      if (displayName) {
-        await updateFirebaseProfile(credential.user, { displayName })
-      }
-      const idToken = await credential.user.getIdToken()
-      const createdAt = credential.user.metadata.creationTime
-        ? new Date(credential.user.metadata.creationTime).toISOString()
-        : new Date().toISOString()
-      await persistFirebaseUser(
-        credential.user.uid,
-        credential.user.email || email,
-        displayName || credential.user.displayName,
-        idToken,
-        createdAt,
-      )
-      setLoading(false)
-    } catch (err) {
-      const message = firebaseAuthErrorMessage(err)
-      setError(message)
-      setLoading(false)
-      throw new Error(message)
-    }
-  }, [persistFirebaseUser])
-
-  const signIn = useCallback(async (email: string, password: string) => {
-    setLoading(true)
-    setError('')
-    try {
-      const credential = await signInWithEmailAndPassword(auth, email, password)
-      const idToken = await credential.user.getIdToken()
-      const createdAt = credential.user.metadata.creationTime
-        ? new Date(credential.user.metadata.creationTime).toISOString()
-        : ''
-      await persistFirebaseUser(
-        credential.user.uid,
-        credential.user.email || email,
-        credential.user.displayName,
-        idToken,
-        createdAt,
-      )
-      setLoading(false)
-    } catch (err) {
-      const message = firebaseAuthErrorMessage(err)
-      setError(message)
-      setLoading(false)
-      throw new Error(message)
-    }
-  }, [persistFirebaseUser])
-
-  const signOut = useCallback(async (opts?: { reason?: 'manual' | 'inactivity' }) => {
-    setLoading(true)
-    try {
-      if (user?.user_id) await authApi.logout(user.user_id)
-    } finally {
-      clearStored()
-      if (opts?.reason === 'inactivity') {
-        try {
-          sessionStorage.setItem('dfd.sessionExpired', 'inactivity')
-        } catch {
-          /* ignore */
+  const signUp = useCallback(
+    async (email: string, password: string, displayName?: string) => {
+      setLoading(true);
+      setError("");
+      try {
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
+        if (displayName) {
+          await updateFirebaseProfile(credential.user, { displayName });
         }
+        try {
+          await sendEmailVerification(credential.user);
+        } catch {
+          // Account creation already succeeded; a failed verification email isn't fatal here.
+        }
+        const createdAt = credential.user.metadata.creationTime
+          ? new Date(credential.user.metadata.creationTime).toISOString()
+          : new Date().toISOString();
+        // Sync the account to our backend, but don't grant an app session yet —
+        // the user must verify their email and log in before they can proceed.
+        await syncFirebaseUser(
+          credential.user.uid,
+          credential.user.email || email,
+          displayName || credential.user.displayName,
+          createdAt,
+        );
+        setLoading(false);
+      } catch (err) {
+        const message = firebaseAuthErrorMessage(err);
+        setError(message);
+        setLoading(false);
+        throw new Error(message);
       }
-      setToken(null)
-      setUser(null)
-      setProfile(emptyProfile())
-      setLoading(false)
-    }
-  }, [user])
+    },
+    [syncFirebaseUser],
+  );
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      setLoading(true);
+      setError("");
+      try {
+        const credential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
+        if (!credential.user.emailVerified) {
+          throw new Error(
+            "Please verify your email before logging in. Check your inbox for the verification link.",
+          );
+        }
+        const idToken = await credential.user.getIdToken();
+        const createdAt = credential.user.metadata.creationTime
+          ? new Date(credential.user.metadata.creationTime).toISOString()
+          : "";
+        await persistFirebaseUser(
+          credential.user.uid,
+          credential.user.email || email,
+          credential.user.displayName,
+          idToken,
+          createdAt,
+        );
+        setLoading(false);
+      } catch (err) {
+        const message = firebaseAuthErrorMessage(err);
+        setError(message);
+        setLoading(false);
+        throw new Error(message);
+      }
+    },
+    [persistFirebaseUser],
+  );
+
+  const signOut = useCallback(
+    async (opts?: { reason?: "manual" | "inactivity" }) => {
+      setLoading(true);
+      try {
+        if (user?.user_id) await authApi.logout(user.user_id);
+      } finally {
+        clearStored();
+        if (opts?.reason === "inactivity") {
+          try {
+            sessionStorage.setItem("dfd.sessionExpired", "inactivity");
+          } catch {
+            /* ignore */
+          }
+        }
+        setToken(null);
+        setUser(null);
+        setProfile(emptyProfile());
+        setLoading(false);
+      }
+    },
+    [user],
+  );
 
   const updateProfile = useCallback(
     async (next: Profile) => {
       if (!user?.user_id) {
-        const msg = 'You must be logged in to update your profile.'
-        setError(msg)
-        throw new Error(msg)
+        const msg = "You must be logged in to update your profile.";
+        setError(msg);
+        throw new Error(msg);
       }
-      setSaving(true)
-      setError('')
+      setSaving(true);
+      setError("");
 
       const res = await authApi.updateProfile(user.user_id, {
         first_name: next.firstName,
         last_name: next.lastName,
         email: next.email,
         phone: next.phone,
-      })
+      });
 
       if (res.error) {
-        setError(res.error)
-        setSaving(false)
-        throw new Error(res.error)
+        setError(res.error);
+        setSaving(false);
+        throw new Error(res.error);
       }
 
       const updatedUser = applyUser(
@@ -296,23 +359,38 @@ export function useAuth(): AuthState & AuthActions {
           phone: next.phone,
         },
         next,
-      )
-      saveStored(token || '', updatedUser)
-      setUser(updatedUser)
-      setProfile(buildProfile(updatedUser))
-      setSaving(false)
+      );
+      saveStored(token || "", updatedUser);
+      setUser(updatedUser);
+      setProfile(buildProfile(updatedUser));
+      setSaving(false);
     },
     [user, token],
-  )
+  );
+
+  const resendVerificationEmail = useCallback(async () => {
+    if (!auth.currentUser) {
+      const msg = "No pending account to verify. Please log in again.";
+      setError(msg);
+      throw new Error(msg);
+    }
+    try {
+      await sendEmailVerification(auth.currentUser);
+    } catch (err) {
+      const message = firebaseAuthErrorMessage(err);
+      setError(message);
+      throw new Error(message);
+    }
+  }, []);
 
   // Inactivity auto-logout
   useInactivityTimeout(
     Boolean(user && token),
     () => {
-      void signOut({ reason: 'inactivity' })
+      void signOut({ reason: "inactivity" });
     },
     sessionTimeoutMinutes * 60 * 1000,
-  )
+  );
 
   return {
     user,
@@ -326,6 +404,7 @@ export function useAuth(): AuthState & AuthActions {
     signIn,
     signOut,
     updateProfile,
+    resendVerificationEmail,
     clearError,
-  }
+  };
 }
