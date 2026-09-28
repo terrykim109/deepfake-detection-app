@@ -161,7 +161,11 @@ export const Upload: React.FC = () => {
                 }}
               >
                 {preview ? (
-                  <img className="preview" src={preview} alt={file?.name ?? 'Selected image'} />
+                  <>
+                    <img className="preview" src={preview} alt={file?.name ?? 'Selected image'} />
+                    <p className="drop-zone-file">{file?.name}</p>
+                    <p className="drop-zone-hint">{isMobile ? 'Tap to choose a different photo' : 'Click or drop to replace'}</p>
+                  </>
                 ) : (
                   <>
                     <img className="drop-zone-icon" src="/assets/icon-image.svg" alt="" />
@@ -197,8 +201,8 @@ export const Upload: React.FC = () => {
                 {busy ? 'Working…' : 'Analyze image'}
               </Button>
               {!busy && (
-                <Button variant="ghost" onClick={clear}>
-                  {file ? 'Clear' : 'Choose another image'}
+                <Button variant="ghost" onClick={file ? clear : openPicker}>
+                  {file ? 'Clear' : 'Browse files'}
                 </Button>
               )}
             </div>

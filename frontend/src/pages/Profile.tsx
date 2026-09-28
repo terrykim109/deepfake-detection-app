@@ -47,11 +47,17 @@ export const Profile: React.FC = () => {
   const displayError = localError || error
 
   const fullName = `${draft.firstName || profile.firstName} ${draft.lastName || profile.lastName}`.trim()
+  const initials = fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('')
 
   return (
     <AppShell>
       <div className="profile-head">
-        <div className="profile-avatar" aria-hidden="true" />
+        <div className="profile-avatar" aria-hidden="true">{initials}</div>
         <h1 className="profile-name">{fullName || 'Your profile'}</h1>
       </div>
 

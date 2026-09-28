@@ -56,40 +56,30 @@ export const History: React.FC = () => {
         ) : (
           <ul className="history-list">
             {sortedHistory.map((row) => (
-              <Card
-                as="li"
-                padding="sm"
-                interactive
-                className="history-row"
-                key={row.id}
-                onClick={() => open(row.id)}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open result for ${row.fileName}`}
-                onKeyDown={(e) => {
-                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault()
-                    open(row.id)
-                  }
-                }}
-              >
-                <div className="history-row-info">
-                  <p className="history-row-name">{row.fileName}</p>
-                  <div className="history-row-meta">
-                    <VerdictBadge verdict={row.verdict} label={row.verdictLabel} size="sm" />
-                    <span>{row.confidence}% confidence</span>
-                  </div>
-                  <p className="history-row-time">{row.timestamp}</p>
-                </div>
+              <Card as="li" padding="none" interactive className="history-row" key={row.id}>
+                {/* Whole-row button opens the result; delete is a sibling so
+                    controls are never nested (WCAG 4.1.2). */}
+                <button
+                  type="button"
+                  className="history-row-open"
+                  onClick={() => open(row.id)}
+                  aria-label={`Open result for ${row.fileName}`}
+                >
+                  <span className="history-row-info">
+                    <span className="history-row-name">{row.fileName}</span>
+                    <span className="history-row-meta">
+                      <VerdictBadge verdict={row.verdict} label={row.verdictLabel} size="sm" />
+                      <span>{row.confidence}% confidence</span>
+                    </span>
+                    <span className="history-row-time">{row.timestamp}</span>
+                  </span>
+                </button>
 
                 <IconButton
+                  className="history-row-delete"
                   icon="/assets/icon-x-octagon.svg"
                   label={`Delete ${row.fileName}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPendingDelete(row.id)
-                  }}
-                  onKeyDown={(e) => e.stopPropagation()}
+                  onClick={() => setPendingDelete(row.id)}
                 />
               </Card>
             ))}
