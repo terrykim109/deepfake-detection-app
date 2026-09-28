@@ -3,6 +3,7 @@ import { Navigate, useParams } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { useAppState } from '../state/AppState'
+import { Button, Card, IconButton, PageHeader, ScoreDial, VerdictBadge } from '../components/ui'
 
 /* Figma frames "Result from History" (20:45) and
    "Saved Confirmation" (115:50) — the score ellipse, the summary and a
@@ -17,27 +18,33 @@ export const ResultDetail: React.FC = () => {
 
   return (
     <AppShell>
-      <section className="panel detail-card">
-        <button className="detail-save" onClick={() => setSaved(true)} aria-label="Save result">
-          <img src="/assets/icon-save.svg" alt="" />
-        </button>
+      <PageHeader title="Saved result" />
 
-        <div className="score">
-          <span>{result.confidence}</span>
-        </div>
+      <Card className="detail-card" padding="lg">
+        <IconButton
+          className="detail-save"
+          size="lg"
+          icon="/assets/icon-save.svg"
+          label="Save result"
+          onClick={() => setSaved(true)}
+        />
+
+        <ScoreDial value={result.confidence} verdict={result.verdict} />
+        <VerdictBadge verdict={result.verdict} label={result.verdictLabel} />
 
         <p className="detail-text">{result.summary}</p>
 
         <p className="detail-meta">
-          {result.fileName} · {result.verdictLabel} · {result.timestamp}
+          {result.fileName} · {result.timestamp}
         </p>
-      </section>
+      </Card>
 
       {saved && (
         <Modal
           title="Results Saved"
           subtitle={'Results can be viewed in the “History” Page'}
           onClose={() => setSaved(false)}
+          actions={<Button onClick={() => setSaved(false)}>OK</Button>}
         />
       )}
     </AppShell>

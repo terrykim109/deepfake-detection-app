@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppState } from "../state/AppState";
+import { Alert, Button, TextField } from "../components/ui";
 
 const MIN_PASSWORD_LENGTH = 12;
 const PASSWORD_REQUIREMENTS_MESSAGE =
@@ -22,7 +23,6 @@ function meetsPasswordPolicy(password: string): boolean {
 export const CreateAccount: React.FC = () => {
   const navigate = useNavigate();
   const { signUp, error, clearError, loading } = useAppState();
-  const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState("");
 
   const submit = async (e: React.FormEvent) => {
@@ -83,79 +83,68 @@ export const CreateAccount: React.FC = () => {
   const displayError = localError || error;
 
   return (
-    <div className="stage auth-page">
+    <div className="auth-page">
       <aside className="auth-aside">
-        <img src="./logo.png" alt="Deepfake Detection" />
+        <img src="/logo.png" alt="Deepfake Detection" />
       </aside>
 
       <main className="auth-main">
         <h1 className="auth-title">Create Account</h1>
 
-        <form onSubmit={submit}>
-          <div className="field">
-            <input
-              name="name"
-              type="text"
-              placeholder="Full Name"
-              autoComplete="name"
-              disabled={loading}
-            />
-          </div>
+        <form className="auth-form" onSubmit={submit}>
+          <TextField
+            name="name"
+            label="Full Name"
+            hideLabel
+            placeholder="Full Name"
+            autoComplete="name"
+            disabled={loading}
+          />
 
-          <div className="field">
-            <input
-              name="email"
-              type="email"
-              placeholder="Email Address"
-              autoComplete="email"
-              disabled={loading}
-            />
-          </div>
+          <TextField
+            name="email"
+            type="email"
+            label="Email Address"
+            hideLabel
+            placeholder="Email Address"
+            autoComplete="email"
+            disabled={loading}
+          />
 
-          <div className="field">
-            <input
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              autoComplete="new-password"
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className="field-toggle"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              <img src="/assets/icon-visibility.svg" alt="" />
-            </button>
-            <p className="field-hint">{PASSWORD_REQUIREMENTS_MESSAGE}</p>
-          </div>
+          <TextField
+            name="password"
+            type="password"
+            label="Password"
+            hideLabel
+            placeholder="Password"
+            autoComplete="new-password"
+            hint={PASSWORD_REQUIREMENTS_MESSAGE}
+            disabled={loading}
+          />
 
-          <div className="field">
-            <input
-              name="confirmPassword"
-              type={showPassword ? "text" : "password"}
-              placeholder="Confirm Password"
-              autoComplete="new-password"
-              disabled={loading}
-            />
-          </div>
+          <TextField
+            name="confirmPassword"
+            type="password"
+            label="Confirm Password"
+            hideLabel
+            placeholder="Confirm Password"
+            autoComplete="new-password"
+            disabled={loading}
+          />
 
-          {displayError && <p className="auth-error">{displayError}</p>}
+          {displayError && <Alert tone="error">{displayError}</Alert>}
 
-          <button type="submit" className="btn auth-submit" disabled={loading}>
+          <Button type="submit" size="lg" fullWidth loading={loading} className="auth-submit">
             {loading ? "Creating account..." : "Create Account"}
-          </button>
+          </Button>
         </form>
 
-        <div className="auth-links">
-          <p>
-            Already have an account?{" "}
-            <Link to="/login" onClick={clearError}>
-              Log in
-            </Link>
-          </p>
-        </div>
+        <p className="auth-links">
+          Already have an account?{" "}
+          <Link to="/login" onClick={clearError}>
+            Log in
+          </Link>
+        </p>
       </main>
     </div>
   );

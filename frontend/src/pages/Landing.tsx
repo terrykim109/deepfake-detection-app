@@ -1,45 +1,48 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Logo } from '../components/AppShell'
+import { Button, Card } from '../components/ui'
 
 /* Figma frame "Landing Page" (node 3:182) */
 export const Landing: React.FC = () => {
   const navigate = useNavigate()
 
   return (
-    <div className="stage">
+    <div className="ui-container">
       <header className="app-header">
         <Logo to="/" />
       </header>
 
-      <nav className="nav-bar">
+      <nav className="nav-bar" aria-label="Account">
         <div className="nav-auth">
-          <button className="nav-btn" onClick={() => navigate('/create-account')}>
+          <Button size="sm" onClick={() => navigate('/create-account')}>
             Create Account
-          </button>
-          <button className="nav-btn" onClick={() => navigate('/login')}>
+          </Button>
+          <Button size="sm" onClick={() => navigate('/login')}>
             Log In
-          </button>
+          </Button>
         </div>
       </nav>
 
-      <section className="panel landing-card">
-        <div className="landing-heading">
-          <p className="l1">Not everything you see is real. Check first.</p>
-          <p className="l2">Create an account to securely analyze your images.</p>
-        </div>
+      <main>
+        <Card className="landing-card" padding="lg">
+          <div className="landing-heading">
+            <h1 className="l1">Not everything you see is real. Check first.</h1>
+            <p className="l2">Create an account to securely analyze your images.</p>
+          </div>
 
-        <div className="landing-tiles">
-          <div className="landing-tile">REAL</div>
-          <div className="landing-tile">Deepfake</div>
-        </div>
+          <div className="landing-tiles">
+            <div className="landing-tile landing-tile--real">REAL</div>
+            <div className="landing-tile landing-tile--fake">Deepfake</div>
+          </div>
 
-        <div className="landing-cta">
-          <button className="btn" onClick={() => navigate('/create-account')}>
-            Get Started
-          </button>
-        </div>
-      </section>
+          <div className="landing-cta">
+            <Button size="lg" onClick={() => navigate('/create-account')}>
+              Get Started
+            </Button>
+          </div>
+        </Card>
+      </main>
     </div>
   )
 }

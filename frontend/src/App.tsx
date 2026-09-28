@@ -9,17 +9,18 @@ import { Upload } from './pages/Upload'
 import { History } from './pages/History'
 import { Results } from './pages/Results'
 import { StyleGuide } from './pages/StyleGuide'
+import { FullPageSpinner } from './components/ui'
 
 /* ─── Auth Guards ─── */
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { user, loading } = useAppState()
-  if (loading) return <div className="loading-full"><span className="spinner" /></div>
+  if (loading) return <FullPageSpinner />
   return user ? children : <Navigate to="/login" replace />
 }
 
 const RedirectIfAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { user, loading } = useAppState()
-  if (loading) return <div className="loading-full"><span className="spinner" /></div>
+  if (loading) return <FullPageSpinner />
   return user ? <Navigate to="/profile" replace /> : children
 }
 
