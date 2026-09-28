@@ -25,15 +25,15 @@
   --nav-inactive: #b8c0cc;   /* unselected nav tab */
   --field-bg: #f9f9f9;       /* filled inputs */
   --hairline: #c9c9c9;       /* underline inputs / social buttons */
-  --muted-label: #767676;    /* field labels — darkened from #9d9d9d for WCAG AA */
+  --muted-label: #6b6b6b;    /* field labels / helper links — darkened from #9d9d9d for WCAG AA (5:1) */
   --subtle-bg: #eef2f7;      /* hover fill for ghost controls */
 
   /* Result states — SDS §4.1.2.1 (FR-10 / BR-13) */
-  --verdict-real-fg: #16845b;
+  --verdict-real-fg: #11704c;
   --verdict-real-bg: #e7f4ee;
   --verdict-fake-fg: #b4232c;
   --verdict-fake-bg: #fbe9ea;
-  --verdict-warn-fg: #8a6d00;
+  --verdict-warn-fg: #7a6000;
   --verdict-warn-bg: #fdf5d8;
   --verdict-failed-fg: #5d6978;
   --verdict-failed-bg: #eceff3;
