@@ -56,7 +56,7 @@ export const Login: React.FC = () => {
 
     try {
       await signIn(email, password);
-      navigate("/profile");
+      navigate("/upload");
     } catch {
       // error surfaced via useAuth
     }
