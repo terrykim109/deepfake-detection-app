@@ -180,7 +180,7 @@ export function useAuth(): AuthState & AuthActions {
     async (
       uid: string,
       email: string,
-      displayName: string | null | undefined,
+      displayName: string | null,
       createdAt: string,
     ): Promise<UserResponse> => {
       const localUser = applyUser({
@@ -208,7 +208,7 @@ export function useAuth(): AuthState & AuthActions {
     async (
       uid: string,
       email: string,
-      displayName: string | null | undefined,
+      displayName: string | null,
       idToken: string,
       createdAt: string,
     ) => {
