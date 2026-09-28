@@ -64,6 +64,23 @@ Icons in `public/assets/` are exported straight from Figma, not
 hand-drawn. The artboard background rects Figma bakes into single-node
 SVG exports were stripped so they render transparent.
 
+## Design system
+
+Reusable UI lives in `src/components/ui` (import from `../components/ui`):
+`Button`, `IconButton`, `TextField`, `Select`, `Card`, `Alert`, `Spinner`,
+`VerdictBadge`, `ScoreDial`, `Toast`, `PageHeader`, `EmptyState`. Styles are
+split into `src/styles/` — `tokens.css` (colours, spacing, radius, type,
+result-state colours), `base.css`, `components.css`, `layout.css` — and
+`index.css` keeps only page-specific rules.
+
+Open **`/styleguide`** (no login needed) to see every token and component
+with copy-paste usage.
+
+Layout is responsive: mobile ≤767px, tablet 768–1279px, desktop ≥1280px
+(the Figma artboard is 1440px). Use CSS media queries for layout, and
+`useIsMobile()` from `src/hooks/useMediaQuery.ts` only when behaviour or
+copy differs by device.
+
 ## Deliberate deviations
 
 1. **Controls the design omits.** Three frames show a state with no

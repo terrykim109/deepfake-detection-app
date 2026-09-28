@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { useAppState, type SortOrder } from '../state/AppState'
+import { Button, Card, EmptyState, IconButton, PageHeader, Select, Toast, VerdictBadge } from '../components/ui'
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+]
 
 /* Figma frames "History" (3:188), "Sorting" (126:162),
    "DeletePopUp" (156:118) and "Deleted History" (117:101) — one screen
@@ -26,75 +32,77 @@ export const History: React.FC = () => {
     toastTimer.current = window.setTimeout(() => setShowDeleted(false), 2400)
   }
 
+  const open = (id: string) => navigate(`/result/${id}`)
+
   return (
     <AppShell>
-      <section className="panel history-card">
-        {showDeleted && <div className="toast">Successfully Deleted!</div>}
+      {showDeleted && <Toast message="Successfully Deleted!" />}
 
-        <div className="history-toolbar">
-          <select
-            className="sort-select"
+      <PageHeader
+        title="History"
+        actions={
+          <Select
+            label="Sort by"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-            aria-label="Sort results"
-          >
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-          </select>
-        </div>
+            options={SORT_OPTIONS}
+          />
+        }
+      />
 
+      <Card className="history-card" padding="md">
         {sortedHistory.length === 0 ? (
-          <p className="history-empty">No saved results yet.</p>
+          <EmptyState icon="/assets/icon-file.svg" message="No saved results yet." />
         ) : (
-          <div className="history-list">
+          <ul className="history-list">
             {sortedHistory.map((row) => (
-              <div
-                className="history-row"
-                key={row.id}
-                onClick={() => navigate(`/result/${row.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && navigate(`/result/${row.id}`)}
-              >
-                <div className="history-row-info">
-                  <div>{row.fileName}</div>
-                  <div className={`history-row-verdict ${row.verdict}`}>
-                    {row.verdictLabel} — {row.confidence}% confidence
-                  </div>
-                  <div>{row.timestamp}</div>
-                </div>
-
+              <Card as="li" padding="none" interactive className="history-row" key={row.id}>
+                {/* Whole-row button opens the result; delete is a sibling so
+                    controls are never nested (WCAG 4.1.2). */}
                 <button
-                  className="history-delete"
-                  aria-label={`Delete ${row.fileName}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPendingDelete(row.id)
-                  }}
+                  type="button"
+                  className="history-row-open"
+                  onClick={() => open(row.id)}
+                  aria-label={`Open result for ${row.fileName}`}
                 >
-                  <img src="/assets/icon-x-octagon.svg" alt="" />
+                  <span className="history-row-info">
+                    <span className="history-row-name">{row.fileName}</span>
+                    <span className="history-row-meta">
+                      <VerdictBadge verdict={row.verdict} label={row.verdictLabel} size="sm" />
+                      <span>{row.confidence}% confidence</span>
+                    </span>
+                    <span className="history-row-time">{row.timestamp}</span>
+                  </span>
                 </button>
-              </div>
+
+                <IconButton
+                  className="history-row-delete"
+                  icon="/assets/icon-x-octagon.svg"
+                  label={`Delete ${row.fileName}`}
+                  onClick={() => setPendingDelete(row.id)}
+                />
+              </Card>
             ))}
-          </div>
+          </ul>
         )}
-      </section>
+      </Card>
 
       {pendingDelete && (
         <Modal
           title="Delete Result?"
           subtitle="Result will be permanently deleted"
           onClose={() => setPendingDelete(null)}
-        >
-          <div className="modal-actions">
-            <button className="modal-btn confirm" onClick={confirmDelete}>
-              Confirm
-            </button>
-            <button className="modal-btn cancel" onClick={() => setPendingDelete(null)}>
-              Cancel
-            </button>
-          </div>
-        </Modal>
+          actions={
+            <>
+              <Button variant="success" onClick={confirmDelete}>
+                Confirm
+              </Button>
+              <Button variant="danger" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </Button>
+            </>
+          }
+        />
       )}
     </AppShell>
   )

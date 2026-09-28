@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppState } from "../state/AppState";
 import { consumeSessionExpired } from "../state/useInactivityTimeout";
+import { Alert, Button, TextField } from "../components/ui";
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +17,6 @@ export const Login: React.FC = () => {
     sessionTimeoutMinutes,
     resendVerificationEmail,
   } = useAppState();
-  const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState("");
   const [sessionNote, setSessionNote] = useState(
     (location.state as { notice?: string } | null)?.notice || "",
@@ -79,73 +79,58 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="stage auth-page">
+    <div className="auth-page">
       <aside className="auth-aside">
-        <img src="./logo.png" alt="Deepfake Detection" />
+        <img src="/logo.png" alt="Deepfake Detection" />
       </aside>
 
       <main className="auth-main">
         <h1 className="auth-title">Log in</h1>
 
-        {sessionNote && <p className="auth-error">{sessionNote}</p>}
+        {sessionNote && <Alert tone="info" className="auth-alert">{sessionNote}</Alert>}
 
-        <form onSubmit={submit}>
-          <div className="field">
-            <input
-              name="email"
-              type="email"
-              placeholder="Email Address"
-              autoComplete="email"
-              disabled={loading}
-            />
-          </div>
+        <form className="auth-form" onSubmit={submit}>
+          <TextField
+            name="email"
+            type="email"
+            label="Email Address"
+            hideLabel
+            placeholder="Email Address"
+            autoComplete="email"
+            disabled={loading}
+          />
 
-          <div className="field">
-            <input
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              autoComplete="current-password"
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className="field-toggle"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              <img src="/assets/icon-visibility.svg" alt="" />
-            </button>
-          </div>
+          <TextField
+            name="password"
+            type="password"
+            label="Password"
+            hideLabel
+            placeholder="Password"
+            autoComplete="current-password"
+            disabled={loading}
+          />
 
-          {displayError && <p className="auth-error">{displayError}</p>}
+          {displayError && <Alert tone="error">{displayError}</Alert>}
 
           {needsVerification && (
-            <button
-              type="button"
-              className="btn-ghost auth-resend"
-              onClick={handleResend}
-              disabled={resending}
-            >
+            <Button variant="ghost" onClick={handleResend} loading={resending}>
               {resending ? "Sending..." : "Resend verification email"}
-            </button>
+            </Button>
           )}
 
-          {resendStatus && <p className="auth-error">{resendStatus}</p>}
+          {resendStatus && <Alert tone="success">{resendStatus}</Alert>}
 
-          <button type="submit" className="btn auth-submit" disabled={loading}>
+          <Button type="submit" size="lg" fullWidth loading={loading} className="auth-submit">
             {loading ? "Logging in..." : "Log in"}
-          </button>
+          </Button>
         </form>
 
-        <div className="auth-links">
-          <p>
-            Don't have an account?{" "}
-            <Link to="/create-account" onClick={clearError}>
-              Create an account
-            </Link>
-          </p>
-        </div>
+        <p className="auth-links">
+          Don't have an account?{" "}
+          <Link to="/create-account" onClick={clearError}>
+            Create an account
+          </Link>
+        </p>
       </main>
     </div>
   );

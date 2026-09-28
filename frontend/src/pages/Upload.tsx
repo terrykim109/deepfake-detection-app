@@ -5,6 +5,8 @@ import { StepIndicator } from '../components/StepIndicator'
 import { useAppState } from '../state/AppState'
 import { TIPS, TIPS_LEAD } from '../data/mock'
 import { validateUploadSelection } from '../upload/validateUpload'
+import { Alert, Button, Card, PageHeader, Spinner } from '../components/ui'
+import { useIsMobile } from '../hooks/useMediaQuery'
 
 /* Figma frame "Image Upload" (node 20:12).
 
@@ -14,6 +16,7 @@ export const Upload: React.FC = () => {
   const navigate = useNavigate()
   const { runAnalysis, analyzing, analysisStage, analysisStageLabel, user } = useAppState()
   const inputRef = useRef<HTMLInputElement>(null)
+  const isMobile = useIsMobile()
 
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -116,27 +119,36 @@ export const Upload: React.FC = () => {
     analysisStageLabel ||
     (busy ? 'Analyzing your image…' : '')
 
+  const openPicker = () => inputRef.current?.click()
+
   return (
     <AppShell>
-      <h1 className="page-title">Upload your media</h1>
+      <PageHeader title="Upload your media" />
 
-      <section className="panel upload-card">
+      <Card className="upload-card" padding="lg">
         <div className="upload-grid">
           <div className="upload-col">
             {busy ? (
-              <div className="processing-box">
-                <div className="spinner" />
-                <p className="processing-text">{statusText}</p>
+              <div className="upload-surface processing-box">
+                <Spinner size="lg" />
+                <p className="processing-text" aria-live="polite">{statusText}</p>
                 {analysisStage !== 'idle' && analysisStage !== 'completed' && (
-                  <p className="processing-stage" aria-live="polite">
-                    Status: {analysisStage}
-                  </p>
+                  <p className="processing-stage">Status: {analysisStage}</p>
                 )}
               </div>
             ) : (
               <div
-                className={`drop-zone${dragging ? ' dragging' : ''}`}
-                onClick={() => inputRef.current?.click()}
+                className={`upload-surface drop-zone${dragging ? ' dragging' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label={preview ? `Selected ${file?.name ?? 'image'}. Choose a different image` : 'Choose an image to upload'}
+                onClick={openPicker}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openPicker()
+                  }
+                }}
                 onDragOver={(e) => {
                   e.preventDefault()
                   setDragging(true)
@@ -149,11 +161,20 @@ export const Upload: React.FC = () => {
                 }}
               >
                 {preview ? (
-                  <img className="preview" src={preview} alt={file?.name ?? 'Selected image'} />
+                  <>
+                    <img className="preview" src={preview} alt={file?.name ?? 'Selected image'} />
+                    <p className="drop-zone-file">{file?.name}</p>
+                    <p className="drop-zone-hint">{isMobile ? 'Tap to choose a different photo' : 'Click or drop to replace'}</p>
+                  </>
                 ) : (
                   <>
-                    <p className="drop-zone-text">Drop your image here</p>
-                    <p className="drop-zone-hint">or click to browse — JPG, JPEG, PNG or WEBP (max 10 MB)</p>
+                    <img className="drop-zone-icon" src="/assets/icon-image.svg" alt="" />
+                    <p className="drop-zone-text">
+                      {isMobile ? 'Tap to choose a photo' : 'Drop your image here'}
+                    </p>
+                    <p className="drop-zone-hint">
+                      {isMobile ? 'JPG, JPEG, PNG or WEBP (max 10 MB)' : 'or click to browse — JPG, JPEG, PNG or WEBP (max 10 MB)'}
+                    </p>
                   </>
                 )}
               </div>
@@ -173,32 +194,34 @@ export const Upload: React.FC = () => {
               <StepIndicator step={busy ? 2 : 1} />
             </div>
 
-            {error && <p className="upload-error">{error}</p>}
+            {error && <Alert tone="error" className="upload-error">{error}</Alert>}
 
             <div className="upload-actions">
-              <button className="btn" onClick={() => void analyze()} disabled={!file || busy}>
+              <Button onClick={() => void analyze()} disabled={!file || busy} loading={busy}>
                 {busy ? 'Working…' : 'Analyze image'}
-              </button>
+              </Button>
               {!busy && (
-                <button className="btn-ghost" onClick={clear}>
-                  {file ? 'Clear' : 'Choose another image'}
-                </button>
+                <Button variant="ghost" onClick={file ? clear : openPicker}>
+                  {file ? 'Clear' : 'Browse files'}
+                </Button>
               )}
             </div>
           </div>
 
-          <aside className="tips-panel">
-            <p className="tips-title">Helpful Tips</p>
+          <aside className="tips-panel" aria-labelledby="tips-title">
+            <h2 id="tips-title" className="tips-title">Helpful Tips</h2>
             <p className="tips-lead">{TIPS_LEAD}</p>
-            {TIPS.map((tip) => (
-              <div className="tip-row" key={tip}>
-                <img src="/assets/icon-check-circle.svg" alt="" />
-                <span>{tip}</span>
-              </div>
-            ))}
+            <ul className="tips-list">
+              {TIPS.map((tip) => (
+                <li className="tip-row" key={tip}>
+                  <img src="/assets/icon-check-circle.svg" alt="" />
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
           </aside>
         </div>
-      </section>
+      </Card>
     </AppShell>
   )
 }

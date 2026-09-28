@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { IconButton } from './ui'
 
 export const Logo: React.FC<{ to?: string }> = ({ to = '/' }) => (
   <Link className="app-logo" to={to} aria-label="Deepfake Detection home">
@@ -18,30 +19,38 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const historyActive = HISTORY_PATHS.some((p) => pathname.startsWith(p))
 
   return (
-    <div className="stage">
+    <div className="ui-container">
       <header className="app-header">
         <Logo to="/upload" />
-        <button className="account-btn" onClick={() => navigate('/profile')} aria-label="Account">
-          <img src="/assets/account-circle.svg" alt="" />
-        </button>
+        <IconButton
+          className="app-account"
+          icon="/assets/account-circle.svg"
+          label="Account"
+          onClick={() => navigate('/profile')}
+          aria-current={pathname.startsWith('/profile') ? 'page' : undefined}
+        />
       </header>
 
-      <nav className="nav-bar">
+      <nav className="nav-bar" aria-label="Main">
         <button
-          className={`nav-tab${analyzeActive ? ' active' : ''}`}
+          type="button"
+          className="nav-tab"
+          aria-current={analyzeActive ? 'page' : undefined}
           onClick={() => navigate('/upload')}
         >
           Analyze
         </button>
         <button
-          className={`nav-tab${historyActive ? ' active' : ''}`}
+          type="button"
+          className="nav-tab"
+          aria-current={historyActive ? 'page' : undefined}
           onClick={() => navigate('/history')}
         >
           History
         </button>
       </nav>
 
-      {children}
+      <main>{children}</main>
     </div>
   )
 }

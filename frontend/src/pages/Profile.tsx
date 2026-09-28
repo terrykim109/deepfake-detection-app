@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { useAppState } from '../state/AppState'
+import { Alert, Button, Card, TextField } from '../components/ui'
 
 /* Profile page — editable fields synced to backend.
    After login, user lands here first. */
@@ -45,43 +46,41 @@ export const Profile: React.FC = () => {
 
   const displayError = localError || error
 
+  const fullName = `${draft.firstName || profile.firstName} ${draft.lastName || profile.lastName}`.trim()
+  const initials = fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('')
+
   return (
     <AppShell>
       <div className="profile-head">
-        <div className="profile-avatar" aria-hidden="true" />
-        <h1 className="profile-name">
-          {draft.firstName || profile.firstName} {draft.lastName || profile.lastName}
-        </h1>
+        <div className="profile-avatar" aria-hidden="true">{initials}</div>
+        <h1 className="profile-name">{fullName || 'Your profile'}</h1>
       </div>
 
-      <section className="profile-card">
-        <div className="profile-field">
-          <label htmlFor="firstName">First Name</label>
-          <input id="firstName" value={draft.firstName} onChange={set('firstName')} disabled={busy} />
-        </div>
-        <div className="profile-field">
-          <label htmlFor="lastName">Last Name</label>
-          <input id="lastName" value={draft.lastName} onChange={set('lastName')} disabled={busy} />
-        </div>
-        <div className="profile-field">
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={draft.email} onChange={set('email')} disabled={busy} />
-        </div>
-        <div className="profile-field">
-          <label htmlFor="phone">Phone Number</label>
-          <input id="phone" type="tel" value={draft.phone} onChange={set('phone')} disabled={busy} autoComplete="tel" />
-        </div>
-      </section>
+      <Card className="profile-card" padding="lg">
+        <TextField variant="filled" id="firstName" label="First Name" value={draft.firstName} onChange={set('firstName')} disabled={busy} autoComplete="given-name" />
+        <TextField variant="filled" id="lastName" label="Last Name" value={draft.lastName} onChange={set('lastName')} disabled={busy} autoComplete="family-name" />
+        <TextField variant="filled" id="email" type="email" label="Email" value={draft.email} onChange={set('email')} disabled={busy} autoComplete="email" />
+        <TextField variant="filled" id="phone" type="tel" label="Phone Number" value={draft.phone} onChange={set('phone')} disabled={busy} autoComplete="tel" />
+      </Card>
 
-      <div className="profile-actions">
-        {savedNote && !displayError && <span className="profile-saved">Profile updated</span>}
-        {displayError && <span className="auth-error" style={{ marginRight: 'auto' }}>{displayError}</span>}
-        <button type="button" className="btn-ghost" onClick={save} disabled={busy}>
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
-        <button type="button" className="btn" onClick={logOut} disabled={busy}>
-          Log Out
-        </button>
+      <div className="profile-footer">
+        <div className="profile-status">
+          {savedNote && !displayError && <Alert tone="success">Profile updated</Alert>}
+          {displayError && <Alert tone="error">{displayError}</Alert>}
+        </div>
+        <div className="profile-actions">
+          <Button variant="ghost" size="lg" onClick={save} disabled={busy} loading={saving}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+          <Button size="lg" onClick={logOut} disabled={busy}>
+            Log Out
+          </Button>
+        </div>
       </div>
     </AppShell>
   )
