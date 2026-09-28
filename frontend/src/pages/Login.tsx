@@ -14,7 +14,6 @@ export const Login: React.FC = () => {
     error,
     clearError,
     loading,
-    sessionTimeoutMinutes,
     resendVerificationEmail,
   } = useAppState();
   const [localError, setLocalError] = useState("");
