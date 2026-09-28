@@ -1,47 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
 
-/* ───────────────────────────────────────────────
-   Design tokens — exact values from the Figma
-   Style Guide frame (node 3:51)
-   ─────────────────────────────────────────────── */
-:root {
-  --primary: #17324d;
-  --secondary: #2f6fed;
-  --accent: #20a39e;
-  --background: #f6f8fb;
-  --text: #182230;
-  --secondary-text: #5d6978;
-  --borders: #d8e0ea;
-  --successful: #16845b;
-  --warning: #c9a227;
-  --error: #c63c45;
-
-  /* Recurring literals from the screens */
-  --btn-dark: #060326;      /* every filled button in the design */
-  --placeholder: #d9d9d9;   /* drop zone, tips panel, score ellipse, modals */
-  --nav-inactive: #b8c0cc;  /* unselected nav tab */
-  --field-bg: #f9f9f9;      /* profile inputs */
-  --hairline: #c9c9c9;      /* auth field underlines / social buttons */
-  --muted-label: #9d9d9d;   /* auth field labels */
-
-  /* Telegraf is a licensed font and is not bundled; Inter is the
-     closest available fallback for the screens that specify it. */
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-poppins: 'Poppins', var(--font-body);
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: var(--font-body);
-  background: var(--background);
-  color: var(--text);
-  -webkit-font-smoothing: antialiased;
-}
-
-button { font-family: inherit; cursor: pointer; border: none; background: none; }
-a { text-decoration: none; color: inherit; }
-input { font-family: inherit; }
+/* Design system — tokens, reset, reusable components, layout shell.
+   Page-specific rules live below. See /styleguide for live examples. */
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/components.css';
+@import './styles/layout.css';
 
 /* The Figma canvas is a fixed 1440×1024 artboard. The stage keeps that
    exact geometry so spacing matches the design 1:1. */
@@ -769,4 +733,37 @@ input { font-family: inherit; }
   align-self: center;
   margin-right: auto;
   margin-left: 82px;
+}
+
+/* ───────────── Style guide (/styleguide) ───────────── */
+.sg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: var(--space-5); }
+.sg-section { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.sg-section-title { font-size: var(--fs-xl); font-weight: 700; }
+.sg-demo { display: flex; flex-direction: column; gap: var(--space-4); }
+.sg-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.sg-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.sg-code {
+  background: #0f1b2a;
+  color: #dbe6f3;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+.sg-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-3); }
+.sg-swatch { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); }
+.sg-swatch-chip { height: 56px; border-radius: var(--radius-md); border: 1px solid var(--borders); }
+.sg-swatch-name { font-weight: 600; font-size: var(--fs-sm); }
+.sg-swatch code, .sg-space-row code, .sg-radius code { color: var(--secondary-text); font-size: 11px; }
+.sg-space-row { display: flex; align-items: center; gap: var(--space-3); }
+.sg-space-row code { width: 80px; }
+.sg-space-bar { height: 12px; background: var(--secondary); border-radius: 2px; }
+.sg-radius {
+  width: 110px;
+  height: 64px;
+  border: 2px solid var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

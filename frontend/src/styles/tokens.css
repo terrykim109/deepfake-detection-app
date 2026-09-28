@@ -1,0 +1,86 @@
+/* ───────────────────────────────────────────────
+   Design tokens
+   Colours are the exact values from the Figma Style Guide frame
+   (node 3:51). Scales below are shared by every component — prefer a
+   token over a raw value in new CSS.
+   ─────────────────────────────────────────────── */
+:root {
+  /* Brand palette (Figma) */
+  --primary: #17324d;
+  --secondary: #2f6fed;
+  --accent: #20a39e;
+  --background: #f6f8fb;
+  --surface: #ffffff;
+  --text: #182230;
+  --secondary-text: #5d6978;
+  --borders: #d8e0ea;
+  --successful: #16845b;
+  --warning: #c9a227;
+  --error: #c63c45;
+
+  /* Recurring literals from the screens */
+  --btn-dark: #060326;       /* every filled button in the design */
+  --btn-dark-hover: #120b3d;
+  --placeholder: #d9d9d9;    /* drop zone, tips panel, score dial */
+  --nav-inactive: #b8c0cc;   /* unselected nav tab */
+  --field-bg: #f9f9f9;       /* filled inputs */
+  --hairline: #c9c9c9;       /* underline inputs / social buttons */
+  --muted-label: #6b6b6b;    /* field labels / helper links — darkened from #9d9d9d for WCAG AA (5:1) */
+  --subtle-bg: #eef2f7;      /* hover fill for ghost controls */
+
+  /* Result states — SDS §4.1.2.1 (FR-10 / BR-13) */
+  --verdict-real-fg: #11704c;
+  --verdict-real-bg: #e7f4ee;
+  --verdict-fake-fg: #b4232c;
+  --verdict-fake-bg: #fbe9ea;
+  --verdict-warn-fg: #7a6000;
+  --verdict-warn-bg: #fdf5d8;
+  --verdict-failed-fg: #5d6978;
+  --verdict-failed-bg: #eceff3;
+
+  /* Alert tones */
+  --alert-error-fg: #a1262e;
+  --alert-error-bg: #fbe9ea;
+  --alert-success-fg: #126e4b;
+  --alert-success-bg: #e7f4ee;
+  --alert-info-fg: #1d4fb8;
+  --alert-info-bg: #e8effd;
+  --alert-warning-fg: #7a6000;
+  --alert-warning-bg: #fdf5d8;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Type — fluid so headings shrink on phones */
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-poppins: 'Poppins', var(--font-body);
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: clamp(18px, 1.2vw + 12px, 20px);
+  --fs-xl: clamp(20px, 1.6vw + 12px, 24px);
+  --fs-2xl: clamp(24px, 2.4vw + 12px, 32px);
+  --fs-3xl: clamp(30px, 3.6vw + 10px, 52px);
+
+  /* Elevation */
+  --shadow-sm: 0 2px 10px rgba(23, 50, 77, 0.08);
+  --shadow-md: 0 8px 24px rgba(23, 50, 77, 0.14);
+
+  /* Focus (NFR-03) */
+  --focus-ring: 0 0 0 3px rgba(47, 111, 237, 0.45);
+
+  --transition: 0.15s ease;
+}

@@ -8,6 +8,7 @@ import { Profile } from './pages/Profile'
 import { Upload } from './pages/Upload'
 import { History } from './pages/History'
 import { Results } from './pages/Results'
+import { StyleGuide } from './pages/StyleGuide'
 
 /* ─── Auth Guards ─── */
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -31,6 +32,8 @@ const AppRoutes: React.FC = () => (
     <Route path="/upload" element={<RequireAuth><Upload /></RequireAuth>} />
     <Route path="/results" element={<RequireAuth><Results /></RequireAuth>} />
     <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
+    {/* Design-system reference for the team — public, not linked in the nav */}
+    <Route path="/styleguide" element={<StyleGuide />} />
     <Route path="/" element={<Navigate to="/profile" replace />} />
     <Route path="*" element={<Navigate to="/profile" replace />} />
   </Routes>
