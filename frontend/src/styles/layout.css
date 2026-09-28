@@ -1,0 +1,16 @@
+/* ───────────────────────────────────────────────
+   Layout shell
+   Breakpoints (keep in sync with hooks/useMediaQuery.ts):
+     mobile  ≤ 767px
+     tablet  768px – 1279px
+     desktop ≥ 1280px  (Figma artboard is 1440px)
+   ─────────────────────────────────────────────── */
+
+.ui-container {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-inline: clamp(var(--space-4), 4.4vw, var(--space-8));
+  padding-bottom: var(--space-8);
+  min-height: 100vh;
+}
