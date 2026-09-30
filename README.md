@@ -1,88 +1,115 @@
 # Deepfake Detection Application
-## Sprint 4 Demo — Login, Account Creation, and Profile Pages with Firebase CRUD ##
 
-## Overview
+A privacy-focused web application for screening images for signs of AI-generated or manipulated content.
 
-The Deepfake Detection Application is a web-based platform that helps users identify images that may have been manipulated or generated using AI. The goal of the project is to provide a secure, accessible, and easy-to-use screening tool for everyday users, content creators, small businesses, educators, and cybersecurity professionals.
+Users can upload an image, receive a preliminary analysis, and view a confidence score with a plain-language explanation. The application is designed for everyday users, content creators, small businesses, educators, and cybersecurity professionals.
 
-As deepfake technology becomes more realistic and widely available, it is increasingly difficult for users to verify suspicious media by sight alone. This application aims to reduce that gap by allowing users to upload an image, receive an analysis result, and view a confidence score that helps them make informed decisions.
+> **Project status:** Core frontend and backend structure are completed. The pre-trained deepfake detection model has not yet been integrated.
 
 ## Project Goals
 
-- Build a functional full-stack web application
-- Allow users to upload an image for deepfake analysis
-- Return a clear result indicating whether the image appears real or manipulated
-- Display a confidence score with the result
-- Design a simple, secure, and user-friendly interface
-- Minimize data retention and handle uploads safely
+- Build a functional full-stack image screening application
+- Provide clear analysis results and confidence information
+- Handle uploaded images temporarily and minimize data retention
+- Provide an accessible interface for non-technical users
+- Keep the detection layer modular so the selected pre-trained model can be replaced if needed
 
-## Team 
+## Architecture
+
+```text
+React / TypeScript
+        │
+        │ /api
+        ▼
+FastAPI / Python
+        │
+        ├── Authentication
+        ├── Image validation & temporary handling
+        ├── Image preprocessing
+        └── Pre-trained detection model
+                │
+                ▼
+        Analysis result
+        ├── Result state
+        ├── Confidence
+        └── Explanation
+
+Firebase Authentication ──► User access
+Firestore ────────────────► Saved result metadata
+```
+## Members
 
 - Rojin Osia - Backend Developer
 - Nattharut Natvongsaku - Frontend Developer and UX/UI Designer
 - Lucy Kwak - Product Research, Backend Development, and Frontend Support
-- Terry Kim - Project Coordination, Backend Development, and System Integration
-
+- Terry Kim - Backend Development, System Integration, and Project Coordination
+- Trinity Ma
 
 ## Tech Stack
 
-### Frontend
-- TypeScript
+**Frontend**
 - React 18
+- TypeScript
 - Vite
-- CSS3 
+- CSS3
 
-### Backend
+**Backend**
 - Python
 - FastAPI
 - Uvicorn
 
-### Detection (Planned)
-- OpenRouter API — vision model inference for media analysis and confidence scoring
+**Authentication & Storage**
+- Firebase Authentication
+- Firebase Firestore
 
-### Storage & Auth (Planned)
-- Firebase Authentication — email/password and Google OAuth login
-- Firebase Firestore — user profiles and saved result metadata
-
-### Detection Model (Planned)
-- SightEngine API — pre-trained deepfake detection model integration
-- PyTorch — custom model training and deployment
-
----
+**Detection**
+- Pre-trained deepfake detection model — **not yet integrated**
 
 ## Getting Started
 
 ### Prerequisites
+
 - Python 3.10+
-- Node.js 20.19+ or 22.12+ (required by Vite 8)
+- Node.js 20.19+ or 22.12+
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/terrykim109/PRJ566-Deepfake-detection-app.git
-cd PRJ566-Deepfake-detection-app
-```
+### Backend
 
-### 2. Start the backend
 ```bash
 cd backend
+
 python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
+
 pip install -r requirements.txt
-python main.py                # Runs on http://localhost:8000
+python main.py
 ```
 
-### 3. Start the frontend
+Backend: `http://localhost:8000`
+
+### Frontend
+
 ```bash
 cd frontend
 npm install
-npm run dev                   # Runs on http://localhost:5173
+npm run dev
 ```
 
-The Vite dev server is configured to proxy `/api` requests to the backend on
-port 8000. The frontend does not make any API calls yet, so the backend is not
-required to run the UI.
+Frontend: `http://localhost:5173`
 
-See **[`frontend/README.md`](frontend/README.md)** for the frontend: the route ↔
-Figma node map, the design tokens, and the deliberate deviations from the design.
+The Vite development server proxies `/api` requests to the backend.
 
+## Current Limitations
 
+- The deepfake detection model has not yet been integrated.
+- Model inference and final evaluation metrics are not yet available.
+- The application is a screening tool, not a forensic or identity-verification authority.
+- Detection results should not be treated as definitive proof.
+
+## Frontend Documentation
+
+See [`frontend/README.md`](frontend/README.md) for the frontend route map, design tokens, Figma references, and documented design deviations.
