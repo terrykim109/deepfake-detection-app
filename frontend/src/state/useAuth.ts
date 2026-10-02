@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
-import { authApi, type UserResponse } from "../api/client";
+import { authApi, setTokenGetter, type UserResponse } from "../api/client";
 import { auth } from "../firebase";
 import {
   clearLastActivity,
@@ -142,6 +142,16 @@ export function useAuth(): AuthState & AuthActions {
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(
     DEFAULT_TIMEOUT_MINUTES,
   );
+
+  useEffect(() => {
+    setTokenGetter(() => {
+      try {
+        return sessionStorage.getItem(TOKEN_KEY);
+      } catch {
+        return null;
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from analysis_limits import (
     check_can_start,
@@ -6,6 +6,7 @@ from analysis_limits import (
     mark_analysis_finished,
     mark_analysis_started,
 )
+from auth_dependency import get_current_user
 from detection import DetectionError, get_detector
 from helpers import generate_id, log_event, now_iso
 from temp_images import delete_temp_image, get_temp_meta, store_temp_image
@@ -16,28 +17,18 @@ router = APIRouter(tags=["analysis"])
 _VALID_OUTCOMES = {"success", "failure", "cancelled"}
 
 
-def _require_user(user_id: str | None) -> str:
-    uid = (user_id or "").strip()
-    if not uid:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Please log in before uploading an image for analysis.",
-        )
-    return uid
-
-
 @router.get("/analysis/usage")
-async def analysis_usage(user_id: str):
-    return get_usage(_require_user(user_id))
+async def analysis_usage(user: dict = Depends(get_current_user)):
+    return get_usage(user["uid"])
 
 
 @router.post("/analysis/validate")
 async def validate_upload(
-    user_id: str = Form(...),
     file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
 ):
     """Validate one image + quota without storing or running the model."""
-    uid = _require_user(user_id)
+    uid = user["uid"]
     data = await file.read()
     message = validate_image_upload(
         filename=file.filename,
@@ -64,8 +55,8 @@ async def validate_upload(
 
 @router.post("/analysis/run")
 async def run_analysis(
-    user_id: str = Form(...),
     file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
 ):
     """
     DFD-02 end-to-end: validate → temp store → detect → delete → return result.
@@ -73,7 +64,7 @@ async def run_analysis(
     One request represents one analysis for the authenticated user.
     The temporary image is deleted on success, provider failure, or unexpected errors.
     """
-    uid = _require_user(user_id)
+    uid = user["uid"]
     data = await file.read()
     filename = file.filename
     content_type = file.content_type
@@ -197,11 +188,11 @@ async def run_analysis(
 
 @router.post("/analysis/start")
 async def start_analysis(
-    user_id: str = Form(...),
     file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
 ):
     """Validate, store temporarily, and mark analysis active (legacy/stepwise path)."""
-    uid = _require_user(user_id)
+    uid = user["uid"]
     data = await file.read()
     message = validate_image_upload(
         filename=file.filename,
@@ -256,12 +247,12 @@ async def start_analysis(
 
 @router.post("/analysis/finish")
 async def finish_analysis(
-    user_id: str = Form(...),
     image_id: str = Form(...),
     outcome: str = Form("success"),
+    user: dict = Depends(get_current_user),
 ):
     """End an analysis and delete the temporary image immediately."""
-    uid = _require_user(user_id)
+    uid = user["uid"]
     iid = (image_id or "").strip()
     result = (outcome or "success").strip().lower()
     if result not in _VALID_OUTCOMES:
@@ -309,9 +300,9 @@ async def finish_analysis(
 
 
 @router.get("/analysis/temp/{image_id}")
-async def temp_image_status(image_id: str, user_id: str):
+async def temp_image_status(image_id: str, user: dict = Depends(get_current_user)):
     """Inspect temp-image timestamps (for deletion verification / debugging)."""
-    uid = _require_user(user_id)
+    uid = user["uid"]
     meta = get_temp_meta(image_id)
     if not meta or (meta.get("user_id") and meta["user_id"] != uid):
         raise HTTPException(status_code=404, detail="Temporary image not found.")
