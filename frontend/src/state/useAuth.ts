@@ -17,6 +17,9 @@ const TOKEN_KEY = "dfd.token";
 const USER_KEY = "dfd.user";
 const DEFAULT_TIMEOUT_MINUTES = 30;
 
+export const EMAIL_NOT_VERIFIED_MESSAGE =
+  "Please verify your email inbox to continue.";
+
 function loadStored(): { token: string | null; user: UserResponse | null } {
   try {
     const token = sessionStorage.getItem(TOKEN_KEY);
@@ -287,7 +290,7 @@ export function useAuth(): AuthState & AuthActions {
           password,
         );
         if (!credential.user.emailVerified) {
-          throw new Error("Please verify your email inbox to continue.");
+          throw new Error(EMAIL_NOT_VERIFIED_MESSAGE);
         }
         const idToken = await credential.user.getIdToken();
         const createdAt = credential.user.metadata.creationTime

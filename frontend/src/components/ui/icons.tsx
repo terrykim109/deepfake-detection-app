@@ -58,6 +58,13 @@ export const TrashCheckIcon: React.FC<IconProps> = (p) => (
   </svg>
 )
 
+export const MailIcon: React.FC<IconProps> = (p) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </svg>
+)
+
 export const CloseIcon: React.FC<IconProps> = (p) => (
   <svg {...base} {...p}>
     <path d="M18 6 6 18M6 6l12 12" />
