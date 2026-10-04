@@ -69,12 +69,7 @@ export const CreateAccount: React.FC = () => {
 
     try {
       await signUp(email, password, name);
-      navigate("/login", {
-        state: {
-          notice:
-            "Account created! Check your email to verify your address before logging in.",
-        },
-      });
+      navigate("/verify-email", { state: { email } });
     } catch {
       // error surfaced via useAuth
     }

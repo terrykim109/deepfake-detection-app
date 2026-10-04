@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './state/AppState'
 import { Login } from './pages/Login'
 import { CreateAccount } from './pages/CreateAccount'
+import { VerifyEmail } from './pages/VerifyEmail'
 import { Profile } from './pages/Profile'
 import { Upload } from './pages/Upload'
 import { History } from './pages/History'
@@ -29,6 +30,7 @@ const AppRoutes: React.FC = () => (
   <Routes>
     <Route path="/login" element={<RedirectIfAuth><Login /></RedirectIfAuth>} />
     <Route path="/create-account" element={<RedirectIfAuth><CreateAccount /></RedirectIfAuth>} />
+    <Route path="/verify-email" element={<RedirectIfAuth><VerifyEmail /></RedirectIfAuth>} />
     <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
     <Route path="/upload" element={<RequireAuth><Upload /></RequireAuth>} />
     <Route path="/results" element={<RequireAuth><Results /></RequireAuth>} />

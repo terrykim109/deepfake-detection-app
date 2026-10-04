@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppState } from "../state/AppState";
+import { EMAIL_NOT_VERIFIED_MESSAGE } from "../state/useAuth";
 import { consumeSessionExpired } from "../state/useInactivityTimeout";
 import { Alert, Button, TextField } from "../components/ui";
 
@@ -14,15 +15,11 @@ export const Login: React.FC = () => {
     error,
     clearError,
     loading,
-    sessionTimeoutMinutes,
-    resendVerificationEmail,
   } = useAppState();
   const [localError, setLocalError] = useState("");
   const [sessionNote, setSessionNote] = useState(
     (location.state as { notice?: string } | null)?.notice || "",
   );
-  const [resendStatus, setResendStatus] = useState("");
-  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     const reason = consumeSessionExpired();
@@ -38,7 +35,6 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setLocalError("");
     setSessionNote("");
-    setResendStatus("");
     clearError();
 
     const form = e.target as HTMLFormElement;
@@ -57,26 +53,16 @@ export const Login: React.FC = () => {
     try {
       await signIn(email, password);
       navigate("/profile");
-    } catch {
-      // error surfaced via useAuth
+    } catch (err) {
+      // Unverified accounts go to the verification page; other errors surface via useAuth
+      if (err instanceof Error && err.message === EMAIL_NOT_VERIFIED_MESSAGE) {
+        clearError();
+        navigate("/verify-email", { state: { email } });
+      }
     }
   };
 
   const displayError = localError || error;
-  const needsVerification = displayError.includes("verify your email");
-
-  const handleResend = async () => {
-    setResendStatus("");
-    setResending(true);
-    try {
-      await resendVerificationEmail();
-      setResendStatus("Verification email re-sent. Please check your inbox.");
-    } catch {
-      // Error handled in resendVerificationEmail
-    } finally {
-      setResending(false);
-    }
-  };
 
   return (
     <div className="auth-page">
@@ -111,14 +97,6 @@ export const Login: React.FC = () => {
           />
 
           {displayError && <Alert tone="error">{displayError}</Alert>}
-
-          {needsVerification && (
-            <Button variant="ghost" onClick={handleResend} loading={resending}>
-              {resending ? "Sending..." : "Resend verification email"}
-            </Button>
-          )}
-
-          {resendStatus && <Alert tone="success">{resendStatus}</Alert>}
 
           <Button type="submit" size="lg" fullWidth loading={loading} className="auth-submit">
             {loading ? "Logging in..." : "Log in"}

@@ -84,6 +84,34 @@
 }
 .auth-links a { color: var(--text); text-decoration: underline; }
 
+/* Email verification — centred card language shared with the Modal */
+.verify {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  margin-inline: auto;
+}
+.verify-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--verdict-real-fg);
+  background: var(--verdict-real-bg);
+  box-shadow: 0 0 0 10px color-mix(in srgb, var(--verdict-real-bg) 50%, transparent);
+  margin-bottom: var(--space-4);
+}
+.verify-icon svg { width: 32px; height: 32px; }
+.verify-title { font-size: var(--fs-2xl); font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: var(--space-2); }
+.verify-text { font-size: var(--fs-md); color: var(--secondary-text); max-width: 44ch; }
+.verify-text strong { color: var(--text); }
+.verify-email { display: block; margin-top: var(--space-1); font-size: var(--fs-lg); overflow-wrap: anywhere; }
+.verify-actions { display: flex; flex-direction: column; gap: var(--space-3); width: min(360px, 100%); margin-top: var(--space-3); }
+.verify-status { width: min(360px, 100%); text-align: left; }
+
 @media (max-width: 767px) {
   .auth-page { flex-direction: column; }
   .auth-aside { width: 100%; height: 140px; }
