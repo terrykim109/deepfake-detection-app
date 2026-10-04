@@ -6,6 +6,7 @@ import {
   Alert,
   Button,
   Card,
+  CheckCircleIcon,
   EmptyState,
   IconButton,
   PageHeader,
@@ -14,6 +15,7 @@ import {
   Spinner,
   TextField,
   Toast,
+  TrashIcon,
   VerdictBadge,
   type VerdictState,
 } from '../components/ui'
@@ -61,7 +63,7 @@ const Section: React.FC<{ id: string; title: string; usage?: string; children: R
 
 export const StyleGuide: React.FC = () => {
   const isMobile = useIsMobile()
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState<'danger' | 'success' | null>(null)
   const [toast, setToast] = useState(false)
   const [sort, setSort] = useState('newest')
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -241,12 +243,13 @@ export const StyleGuide: React.FC = () => {
           <Section
             id="feedback"
             title="Modal & Toast"
-            usage={`<Modal title="Delete Result?" subtitle="…" onClose={close}
-    actions={<><Button variant="success">Confirm</Button><Button variant="danger">Cancel</Button></>} />
+            usage={`<Modal title="Delete Result?" subtitle="…" icon={<TrashIcon />} tone="danger" onClose={close}
+    actions={<><Button variant="ghost">Cancel</Button><Button variant="danger">Delete</Button></>} />
   {show && <Toast message="Successfully Deleted!" />}`}
           >
             <div className="sg-row">
-              <Button onClick={() => setModalOpen(true)}>Open modal</Button>
+              <Button onClick={() => setModalOpen('danger')}>Open danger modal</Button>
+              <Button onClick={() => setModalOpen('success')}>Open success modal</Button>
               <Button variant="ghost" onClick={flashToast}>Show toast</Button>
             </div>
           </Section>
@@ -272,17 +275,29 @@ export const StyleGuide: React.FC = () => {
         </div>
       </main>
 
-      {modalOpen && (
+      {modalOpen === 'danger' && (
         <Modal
           title="Delete Result?"
-          subtitle="Result will be permanently deleted"
-          onClose={() => setModalOpen(false)}
+          subtitle="This result will be permanently deleted. This can't be undone."
+          icon={<TrashIcon />}
+          tone="danger"
+          onClose={() => setModalOpen(null)}
           actions={
             <>
-              <Button variant="success" onClick={() => setModalOpen(false)}>Confirm</Button>
-              <Button variant="danger" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setModalOpen(null)}>Cancel</Button>
+              <Button variant="danger" onClick={() => setModalOpen(null)}>Delete</Button>
             </>
           }
+        />
+      )}
+      {modalOpen === 'success' && (
+        <Modal
+          title="Results Saved"
+          subtitle={'Results can be viewed in the “History” Page.'}
+          icon={<CheckCircleIcon />}
+          tone="success"
+          onClose={() => setModalOpen(null)}
+          actions={<Button onClick={() => setModalOpen(null)}>OK</Button>}
         />
       )}
       {toast && <Toast message="Successfully Deleted!" />}

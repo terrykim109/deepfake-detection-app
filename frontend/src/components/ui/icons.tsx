@@ -63,3 +63,10 @@ export const CloseIcon: React.FC<IconProps> = (p) => (
     <path d="M18 6 6 18M6 6l12 12" />
   </svg>
 )
+
+export const TrashIcon: React.FC<IconProps> = (p) => (
+  <svg {...base} {...p}>
+    <path d="M3 6h18M8 6V4h8v2M5 6l1 14h12l1-14" />
+    <path d="M10 11v5M14 11v5" />
+  </svg>
+)
