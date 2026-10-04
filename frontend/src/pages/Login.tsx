@@ -52,7 +52,7 @@ export const Login: React.FC = () => {
 
     try {
       await signIn(email, password);
-      navigate("/profile");
+      navigate("/upload");
     } catch (err) {
       // Unverified accounts go to the verification page; other errors surface via useAuth
       if (err instanceof Error && err.message === EMAIL_NOT_VERIFIED_MESSAGE) {

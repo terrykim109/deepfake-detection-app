@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
-import { authApi, type UserResponse } from "../api/client";
+import { authApi, setTokenGetter, type UserResponse } from "../api/client";
 import { auth } from "../firebase";
 import {
   clearLastActivity,
@@ -147,6 +147,16 @@ export function useAuth(): AuthState & AuthActions {
   );
 
   useEffect(() => {
+    setTokenGetter(() => {
+      try {
+        return sessionStorage.getItem(TOKEN_KEY);
+      } catch {
+        return null;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     authApi.sessionConfig().then((res) => {
       if (cancelled || !res.data?.timeout_minutes) return;
@@ -183,7 +193,7 @@ export function useAuth(): AuthState & AuthActions {
     async (
       uid: string,
       email: string,
-      displayName: string | null | undefined,
+      displayName: string | null,
       createdAt: string,
     ): Promise<UserResponse> => {
       const localUser = applyUser({
@@ -211,7 +221,7 @@ export function useAuth(): AuthState & AuthActions {
     async (
       uid: string,
       email: string,
-      displayName: string | null | undefined,
+      displayName: string | null,
       idToken: string,
       createdAt: string,
     ) => {
