@@ -4,7 +4,7 @@ import { AppShell } from '../components/AppShell'
 import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
 import { useAppState } from '../state/AppState'
-import { Alert, Button, Card, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
+import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
 
 /* Fixed advisory text required on every result (SDS §4.1.2.7, BR-12 / FR-11). */
 const DISCLAIMER =
@@ -96,6 +96,8 @@ export const Results: React.FC = () => {
         <Modal
           title="Results Saved"
           subtitle={'Results can be viewed in the “History” Page. The original image was not saved.'}
+          icon={<CheckCircleIcon />}
+          tone="success"
           onClose={() => setSaved(false)}
           actions={<Button onClick={() => setSaved(false)}>OK</Button>}
         />

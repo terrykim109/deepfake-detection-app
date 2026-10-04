@@ -3,7 +3,7 @@ import { Navigate, useParams } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { useAppState } from '../state/AppState'
-import { Button, Card, IconButton, PageHeader, ScoreDial, VerdictBadge } from '../components/ui'
+import { Button, Card, CheckCircleIcon, IconButton, PageHeader, ScoreDial, VerdictBadge } from '../components/ui'
 
 /* Figma frames "Result from History" (20:45) and
    "Saved Confirmation" (115:50) — the score ellipse, the summary and a
@@ -43,6 +43,8 @@ export const ResultDetail: React.FC = () => {
         <Modal
           title="Results Saved"
           subtitle={'Results can be viewed in the “History” Page'}
+          icon={<CheckCircleIcon />}
+          tone="success"
           onClose={() => setSaved(false)}
           actions={<Button onClick={() => setSaved(false)}>OK</Button>}
         />

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { useAppState, type SortOrder } from '../state/AppState'
-import { Button, Card, EmptyState, IconButton, PageHeader, Select, Toast, VerdictBadge } from '../components/ui'
+import { Button, Card, EmptyState, IconButton, PageHeader, Select, Toast, TrashIcon, VerdictBadge } from '../components/ui'
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -90,15 +90,17 @@ export const History: React.FC = () => {
       {pendingDelete && (
         <Modal
           title="Delete Result?"
-          subtitle="Result will be permanently deleted"
+          subtitle="This result will be permanently deleted. This can't be undone."
+          icon={<TrashIcon />}
+          tone="danger"
           onClose={() => setPendingDelete(null)}
           actions={
             <>
-              <Button variant="success" onClick={confirmDelete}>
-                Confirm
-              </Button>
-              <Button variant="danger" onClick={() => setPendingDelete(null)}>
+              <Button variant="ghost" onClick={() => setPendingDelete(null)}>
                 Cancel
+              </Button>
+              <Button variant="danger" onClick={confirmDelete}>
+                Delete
               </Button>
             </>
           }
