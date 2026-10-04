@@ -5,6 +5,21 @@ interface ApiResponse<T> {
   error?: string
 }
 
+let tokenGetter: () => string | null = () => null
+
+export function setTokenGetter(fn: () => string | null) {
+  tokenGetter = fn
+}
+
+function authHeaders(base?: HeadersInit): HeadersInit {
+  const headers: Record<string, string> = {
+    ...((base as Record<string, string> | undefined) || {}),
+  }
+  const token = tokenGetter()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return headers
+}
+
 function errorMessage(data: unknown, status: number): string {
   if (data && typeof data === 'object' && 'detail' in data) {
     const detail = (data as { detail: unknown }).detail
@@ -26,7 +41,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+      headers: authHeaders({ 'Content-Type': 'application/json', ...(init?.headers || {}) }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { error: errorMessage(data, res.status) }
@@ -140,7 +155,12 @@ export interface AnalysisRunResponse {
 
 async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<ApiResponse<T>> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: form, signal })
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      body: form,
+      signal,
+      headers: authHeaders(),
+    })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { error: errorMessage(data, res.status) }
     return { data }

@@ -14,7 +14,6 @@ export const Login: React.FC = () => {
     error,
     clearError,
     loading,
-    sessionTimeoutMinutes,
     resendVerificationEmail,
   } = useAppState();
   const [localError, setLocalError] = useState("");
@@ -56,7 +55,7 @@ export const Login: React.FC = () => {
 
     try {
       await signIn(email, password);
-      navigate("/profile");
+      navigate("/upload");
     } catch {
       // error surfaced via useAuth
     }
