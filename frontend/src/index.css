@@ -69,7 +69,6 @@
   gap: var(--space-5);
   margin-bottom: var(--space-4);
 }
-.auth-title::after { content: ''; flex: 1; max-width: 100px; height: 1px; background: #000; }
 
 .auth-alert { margin-bottom: var(--space-2); }
 .auth-form { display: flex; flex-direction: column; gap: clamp(var(--space-4), 2.5vw, 30px); }
