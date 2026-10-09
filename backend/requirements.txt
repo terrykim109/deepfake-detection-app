@@ -10,3 +10,9 @@ packaging
 tqdm
 ftfy
 regex
+
+numpy
+opencv-python-headless
+exifread
+
+pytest
