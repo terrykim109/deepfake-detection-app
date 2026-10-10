@@ -232,3 +232,63 @@ export const analysisApi = {
     return postForm<AnalysisFinishResponse>('/api/analysis/finish', form)
   },
 }
+
+export interface ForensicsMetadataResult {
+  available: boolean
+  file_info?: { format: string | null; width: number; height: number; mode: string }
+  exif?: Record<string, unknown>
+  has_gps?: boolean
+  software?: string | null
+  camera_make?: string | null
+  camera_model?: string | null
+  date_taken?: string | null
+  error?: string
+}
+
+export interface ForensicsElaResult {
+  available: boolean
+  image_base64?: string
+  mean_error?: number
+  max_error?: number
+  jpeg_quality?: number
+  error?: string
+}
+
+export interface ForensicsNoiseResult {
+  available: boolean
+  image_base64?: string
+  mean_block_variance?: number
+  std_block_variance?: number
+  outlier_block_count?: number
+  block_size?: number
+  error?: string
+}
+
+export interface ForensicsC2paResult {
+  found: boolean
+  detail: string
+  claim_generator?: string | null
+}
+
+export interface ForensicsResult {
+  metadata: ForensicsMetadataResult
+  ela: ForensicsElaResult
+  noise: ForensicsNoiseResult
+  c2pa: ForensicsC2paResult
+}
+
+export interface ForensicsRunResponse {
+  ok: boolean
+  status: string
+  file_name: string
+  forensics: ForensicsResult
+}
+
+export const forensicsApi = {
+  /** Independent forensics engine: metadata/EXIF, ELA, noise, C2PA. */
+  run: (file: File, signal?: AbortSignal) => {
+    const form = new FormData()
+    form.append('file', file)
+    return postForm<ForensicsRunResponse>('/api/forensics/run', form, signal)
+  },
+}
