@@ -7,6 +7,7 @@ from firebase_config import db
 from routers import auth
 from routers import users
 from routers import analysis
+from routers import forensics
 from temp_images import start_temp_image_sweeper
 
 app = FastAPI(title="Deepfake Detection API")
@@ -25,6 +26,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
+app.include_router(forensics.router, prefix="/api")
 
 # Purge abandoned temp uploads so nothing outlives 60 seconds
 start_temp_image_sweeper()
