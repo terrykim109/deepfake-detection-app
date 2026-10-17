@@ -63,7 +63,6 @@ export const History: React.FC = () => {
                   type="button"
                   className="history-row-open"
                   onClick={() => open(row.id)}
-                  aria-label={`Open result for ${row.fileName}`}
                 >
                   <span className="history-row-info">
                     <span className="history-row-name">{row.fileName}</span>
