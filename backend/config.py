@@ -38,6 +38,7 @@ TEMP_UPLOAD_DIR = str(Path(__file__).resolve().parent / "tmp_uploads")
 DETECTION_PROVIDER = os.getenv("DETECTION_PROVIDER", "openrouter")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODELS = [
+    "nvidia/nemotron-3.5-super-vl:free",
     "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-31b-it:free",
     "openrouter/free",
