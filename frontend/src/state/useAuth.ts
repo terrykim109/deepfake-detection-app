@@ -172,8 +172,17 @@ export function useAuth(): AuthState & AuthActions {
     const storedToken = stored.token;
     if (!storedUser?.user_id || !storedToken) return;
 
+    // Ensure the Firebase ID token is attached before restoring the session.
+    setTokenGetter(() => {
+      try {
+        return sessionStorage.getItem(TOKEN_KEY);
+      } catch {
+        return null;
+      }
+    });
+
     let cancelled = false;
-    authApi.me(storedUser.user_id).then((res) => {
+    authApi.me(storedToken).then((res) => {
       if (cancelled || !res.data) return;
       const nextUser = applyUser(res.data, storedUser);
       saveStored(storedToken, nextUser);
@@ -188,13 +197,14 @@ export function useAuth(): AuthState & AuthActions {
 
   const clearError = useCallback(() => setError(""), []);
 
-  // Sync Firebase user to BE, but do not allow users to continue session until email verification completed
+  // Sync Firebase user to BE after email verification + login.
   const syncFirebaseUser = useCallback(
     async (
       uid: string,
       email: string,
       displayName: string | null,
       createdAt: string,
+      idToken: string,
     ): Promise<UserResponse> => {
       const localUser = applyUser({
         id: uid,
@@ -205,12 +215,19 @@ export function useAuth(): AuthState & AuthActions {
         created_at: createdAt,
       });
 
-      const synced = await authApi.syncUser({
-        user_id: uid,
-        email,
-        display_name: displayName,
-        auth_provider: "firebase",
-      });
+      // UID is derived from the verified bearer token on the backend.
+      const synced = await authApi.syncUser(
+        {
+          email,
+          display_name: displayName,
+          auth_provider: "firebase",
+        },
+        idToken,
+      );
+
+      if (synced.error) {
+        throw new Error(synced.error);
+      }
 
       return applyUser(synced.data || localUser, localUser);
     },
@@ -225,14 +242,19 @@ export function useAuth(): AuthState & AuthActions {
       idToken: string,
       createdAt: string,
     ) => {
+      // Attach the Firebase ID token before any authenticated backend call.
+      sessionStorage.setItem(TOKEN_KEY, idToken);
+      setTokenGetter(() => idToken);
+      setToken(idToken);
+
       const nextUser = await syncFirebaseUser(
         uid,
         email,
         displayName,
         createdAt,
+        idToken,
       );
       saveStored(idToken, nextUser);
-      setToken(idToken);
       setUser(nextUser);
       setProfile(buildProfile(nextUser));
     },
@@ -257,17 +279,8 @@ export function useAuth(): AuthState & AuthActions {
         } catch {
           // Account creation already succeeded; a failed verification email isn't fatal here.
         }
-        const createdAt = credential.user.metadata.creationTime
-          ? new Date(credential.user.metadata.creationTime).toISOString()
-          : new Date().toISOString();
-        // Sync the account to our backend, but don't grant an app session yet —
-        // the user must verify their email and log in before they can proceed.
-        await syncFirebaseUser(
-          credential.user.uid,
-          credential.user.email || email,
-          displayName || credential.user.displayName,
-          createdAt,
-        );
+        // Do not call /users/sync here: the backend rejects unverified tokens
+        // (and identity sync runs on verified login via persistFirebaseUser).
         setLoading(false);
       } catch (err) {
         const message = firebaseAuthErrorMessage(err);
@@ -276,7 +289,7 @@ export function useAuth(): AuthState & AuthActions {
         throw new Error(message);
       }
     },
-    [syncFirebaseUser],
+    [],
   );
 
   const signIn = useCallback(
@@ -292,7 +305,8 @@ export function useAuth(): AuthState & AuthActions {
         if (!credential.user.emailVerified) {
           throw new Error(EMAIL_NOT_VERIFIED_MESSAGE);
         }
-        const idToken = await credential.user.getIdToken();
+        // Force refresh so email_verified and other claims are current.
+        const idToken = await credential.user.getIdToken(true);
         const createdAt = credential.user.metadata.creationTime
           ? new Date(credential.user.metadata.creationTime).toISOString()
           : "";
@@ -347,12 +361,16 @@ export function useAuth(): AuthState & AuthActions {
       setSaving(true);
       setError("");
 
-      const res = await authApi.updateProfile(user.user_id, {
-        first_name: next.firstName,
-        last_name: next.lastName,
-        email: next.email,
-        phone: next.phone,
-      });
+      const res = await authApi.updateProfile(
+        user.user_id,
+        {
+          first_name: next.firstName,
+          last_name: next.lastName,
+          email: next.email,
+          phone: next.phone,
+        },
+        token,
+      );
 
       if (res.error) {
         setError(res.error);

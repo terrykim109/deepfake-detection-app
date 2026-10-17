@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+// In dev, default to same-origin `/api` so the Vite proxy forwards the
+// Authorization header. Cross-origin calls to :8000 can omit it in some browsers.
+const API_BASE =
+  import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? '' : 'http://localhost:8000')
 
 interface ApiResponse<T> {
   data?: T
@@ -11,12 +14,10 @@ export function setTokenGetter(fn: () => string | null) {
   tokenGetter = fn
 }
 
-function authHeaders(base?: HeadersInit): HeadersInit {
-  const headers: Record<string, string> = {
-    ...((base as Record<string, string> | undefined) || {}),
-  }
-  const token = tokenGetter()
-  if (token) headers['Authorization'] = `Bearer ${token}`
+function authHeaders(base?: HeadersInit, explicitToken?: string | null): Headers {
+  const headers = new Headers(base)
+  const token = explicitToken ?? tokenGetter()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
   return headers
 }
 
@@ -37,11 +38,19 @@ function errorMessage(data: unknown, status: number): string {
   return `Error ${status}`
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  explicitToken?: string | null,
+): Promise<ApiResponse<T>> {
   try {
+    const headers = authHeaders(init?.headers, explicitToken)
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json')
+    }
     const res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: authHeaders({ 'Content-Type': 'application/json', ...(init?.headers || {}) }),
+      headers,
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { error: errorMessage(data, res.status) }
@@ -51,16 +60,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse
   }
 }
 
-async function get<T>(path: string): Promise<ApiResponse<T>> {
-  return request<T>(path)
+async function get<T>(path: string, explicitToken?: string | null): Promise<ApiResponse<T>> {
+  return request<T>(path, undefined, explicitToken)
 }
 
-async function post<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
-  return request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+async function post<T>(
+  path: string,
+  body: unknown,
+  explicitToken?: string | null,
+): Promise<ApiResponse<T>> {
+  return request<T>(path, { method: 'POST', body: JSON.stringify(body) }, explicitToken)
 }
 
-async function put<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
-  return request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
+async function put<T>(
+  path: string,
+  body: unknown,
+  explicitToken?: string | null,
+): Promise<ApiResponse<T>> {
+  return request<T>(path, { method: 'PUT', body: JSON.stringify(body) }, explicitToken)
 }
 
 export interface UserResponse {
@@ -132,6 +149,16 @@ export interface AnalysisFinishResponse {
   privacy: AnalysisPrivacy
 }
 
+export interface AnalysisFindingPayload {
+  id: string
+  label: string
+  explanation: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface AnalysisRunResultPayload {
   id: string
   verdict: string
@@ -141,6 +168,7 @@ export interface AnalysisRunResultPayload {
   file_name: string
   created_at: string
   provider?: string
+  findings?: AnalysisFindingPayload[]
 }
 
 export interface AnalysisRunResponse {
@@ -180,20 +208,24 @@ export const authApi = {
   logout: (userId?: string) =>
     post('/api/auth/logout', { user_id: userId }),
 
-  me: (userId: string) =>
-    get<UserResponse>(`/api/auth/me?user_id=${encodeURIComponent(userId)}`),
+  me: (token?: string | null) => get<UserResponse>('/api/auth/me', token),
 
   sessionConfig: () => get<SessionConfig>('/api/auth/session-config'),
 
-  syncUser: (user: {
-    user_id: string
-    email: string
-    display_name?: string | null
-    auth_provider?: string
-  }) => post<UserResponse>('/api/users/sync', user),
+  syncUser: (
+    user: {
+      email: string
+      display_name?: string | null
+      auth_provider?: string
+    },
+    token?: string | null,
+  ) => post<UserResponse>('/api/users/sync', user, token),
 
-  updateProfile: (userId: string, profile: { first_name?: string; last_name?: string; email?: string; phone?: string }) =>
-    put<UserResponse>(`/api/users/${userId}/profile`, profile),
+  updateProfile: (
+    userId: string,
+    profile: { first_name?: string; last_name?: string; email?: string; phone?: string },
+    token?: string | null,
+  ) => put<UserResponse>(`/api/users/${userId}/profile`, profile, token),
 }
 
 export const analysisApi = {

@@ -1,18 +1,23 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_config import db
 from helpers import now_iso, log_event, user_from_doc
 from schemas import ProfileUpdate, UserResponse, UserSync
+from auth_dependency import get_current_user
 
 router = APIRouter(tags=["users"])
 users_ref = db.collection("users")
 
 
 @router.post("/users/sync", response_model=UserResponse)
-async def sync_user(body: UserSync):
-    """Create or refresh a Firestore profile for a Firebase Auth user."""
-    user_id = (body.user_id or "").strip()
-    if not user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
+async def sync_user(body: UserSync, user: dict = Depends(get_current_user)):
+    """Create or refresh a Firestore profile for the authenticated Firebase user."""
+    user_id = user["uid"]
+    body_uid = (body.user_id or "").strip()
+    if body_uid and body_uid != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot sync a different user's profile",
+        )
 
     doc_ref = users_ref.document(user_id)
     existing = doc_ref.get()
@@ -58,8 +63,18 @@ async def sync_user(body: UserSync):
 
 
 @router.put("/users/{user_id}/profile", response_model=UserResponse)
-async def update_profile(user_id: str, body: ProfileUpdate):
+async def update_profile(
+    user_id: str,
+    body: ProfileUpdate,
+    user: dict = Depends(get_current_user),
+):
     """Update user profile fields in Firestore (creates the doc if missing)."""
+    if user_id != user["uid"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot update a different user's profile",
+        )
+
     doc_ref = users_ref.document(user_id)
     doc = doc_ref.get()
     existing = doc.to_dict() if doc.exists else {}
