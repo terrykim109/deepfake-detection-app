@@ -1,7 +1,6 @@
-// In dev, default to same-origin `/api` so the Vite proxy forwards the
-// Authorization header. Cross-origin calls to :8000 can omit it in some browsers.
-const API_BASE =
-  import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? '' : 'http://localhost:8000')
+// Hit the FastAPI backend directly. CORS already allows Authorization.
+// (Same-origin Vite proxy was returning 404 when the backend wasn't reached.)
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 interface ApiResponse<T> {
   data?: T
@@ -56,7 +55,16 @@ async function request<T>(
     if (!res.ok) return { error: errorMessage(data, res.status) }
     return { data }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Network error' }
+    const message = err instanceof Error ? err.message : 'Network error'
+    if (/failed to fetch|networkerror|load failed/i.test(message)) {
+      return {
+        error:
+          'Cannot reach the API at ' +
+          (API_BASE || window.location.origin) +
+          '. Is the backend running on port 8000?',
+      }
+    }
+    return { error: message }
   }
 }
 

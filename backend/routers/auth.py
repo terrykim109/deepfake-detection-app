@@ -30,9 +30,18 @@ async def read_me(user: dict = Depends(get_current_user)):
     user_id = user["uid"]
     doc = users_ref.document(user_id).get()
     if not doc.exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+        # get_current_user normally upserts; rebuild a minimal profile if needed.
+        claims = user.get("claims") or {}
+        email = (claims.get("email") or "").strip()
+        return user_from_doc(
+            user_id,
+            {
+                "user_id": user_id,
+                "email": email,
+                "display_name": claims.get("name") or (email.split("@")[0] if email else user_id),
+                "auth_provider": "firebase",
+                "created_at": "",
+            },
         )
     data = doc.to_dict() or {}
     return user_from_doc(doc.id, {**data, "user_id": doc.id})
