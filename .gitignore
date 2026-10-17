@@ -1,11 +1,15 @@
 node_modules/
 
+# Frontend
+frontend/dist/
+
 # Backend
 backend/serviceAccountKey.json
 backend/venv/
-backend/__pycache__/
+backend/**/__pycache__/
 backend/*.pyc
 backend/tmp_uploads/
+backend/.pytest_cache/
 
 .env
 .env.local

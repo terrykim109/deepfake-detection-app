@@ -22,9 +22,10 @@ class ProfileUpdate(BaseModel):
     phone: str = ""
 
 
-# Sync Firebase Auth user into Firestore profiles
+# Sync Firebase Auth user into Firestore profiles.
+# Identity comes from the verified bearer token; client-supplied user_id is ignored.
 class UserSync(BaseModel):
-    user_id: str
+    user_id: str | None = None
     email: str = ""
     display_name: str | None = None
     auth_provider: str = "firebase"

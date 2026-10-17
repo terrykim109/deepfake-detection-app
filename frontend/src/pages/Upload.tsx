@@ -99,9 +99,11 @@ export const Upload: React.FC = () => {
       }
 
       await runAnalysis(file, preview, controller.signal)
+      // AppState now owns the blob URL for Results zoom — do not revoke it here.
       handedOff.current = true
       setFile(null)
-      setPreviewUrl(null)
+      previewRef.current = null
+      setPreview(null)
       if (inputRef.current) inputRef.current.value = ''
       navigate('/results')
     } catch (err) {
