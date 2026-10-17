@@ -1,12 +1,46 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth, type AuthState, type AuthActions } from './useAuth'
-import { HISTORY_SEED, type AnalysisResult } from '../data/mock'
+import { type AnalysisResult } from '../data/mock'
 import { createHttpDetector } from '../detection/httpDetector'
 import type { AnalysisStage, Detector } from '../detection/detector'
 import { ANALYSIS_STAGE_LABELS } from '../detection/detector'
 import { validateUploadSelection } from '../upload/validateUpload'
 
 export type SortOrder = 'newest' | 'oldest'
+
+const HISTORY_STORAGE_PREFIX = 'dfd.history.'
+
+function historyKey(userId: string) {
+  return `${HISTORY_STORAGE_PREFIX}${userId}`
+}
+
+function loadHistory(userId: string | null | undefined): AnalysisResult[] {
+  if (!userId) return []
+  try {
+    const raw = localStorage.getItem(historyKey(userId))
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (row) =>
+        row &&
+        typeof row === 'object' &&
+        typeof row.id === 'string' &&
+        typeof row.fileName === 'string',
+    ) as AnalysisResult[]
+  } catch {
+    return []
+  }
+}
+
+function persistHistory(userId: string | null | undefined, rows: AnalysisResult[]) {
+  if (!userId) return
+  try {
+    localStorage.setItem(historyKey(userId), JSON.stringify(rows))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 type AppStateValue = AuthState & AuthActions & {
   history: AnalysisResult[]
@@ -90,13 +124,20 @@ export const AppStateProvider: React.FC<{
     [detector],
   )
 
-  const [history, setHistory] = useState<AnalysisResult[]>(HISTORY_SEED)
+  const userId = authState.user?.user_id ?? null
+  const [history, setHistory] = useState<AnalysisResult[]>(() => loadHistory(userId))
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest')
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle')
   const analyzingRef = useRef(false)
+  const previewUrlRef = useRef<string | null>(null)
+
+  // Load this user's real history when auth identity changes (no mock seed).
+  useEffect(() => {
+    setHistory(loadHistory(userId))
+  }, [userId])
 
   const sortedHistory = useMemo(() => {
     const dir = sortOrder === 'newest' ? -1 : 1
@@ -106,14 +147,31 @@ export const AppStateProvider: React.FC<{
   }, [history, sortOrder])
 
   const clearAnalysis = useCallback(() => {
+    revokePreview(previewUrlRef.current)
+    previewUrlRef.current = null
     setCurrentResult(null)
     setPreviewUrl(null)
     setAnalysisStage('idle')
   }, [])
 
-  const saveResult = useCallback((result: AnalysisResult) => {
-    const safe = toHistorySafe(result)
-    setHistory((rows) => (rows.some((r) => r.id === safe.id) ? rows : [safe, ...rows]))
+  const saveResult = useCallback(
+    (result: AnalysisResult) => {
+      const safe = toHistorySafe(result)
+      setHistory((rows) => {
+        const next = rows.some((r) => r.id === safe.id) ? rows : [safe, ...rows]
+        persistHistory(userIdRef.current, next)
+        return next
+      })
+    },
+    [],
+  )
+
+  const deleteResult = useCallback((id: string) => {
+    setHistory((rows) => {
+      const next = rows.filter((r) => r.id !== id)
+      persistHistory(userIdRef.current, next)
+      return next
+    })
   }, [])
 
   const isSaved = useCallback(
@@ -143,8 +201,12 @@ export const AppStateProvider: React.FC<{
         const detection = await activeDetector.analyze(file, signal, setAnalysisStage)
         if (signal?.aborted) throw new DOMException('Analysis aborted', 'AbortError')
 
-        revokePreview(preview)
-        setPreviewUrl(null)
+        // Keep a session-only local preview for Results zoom; server still deletes the file.
+        if (previewUrlRef.current && previewUrlRef.current !== preview) {
+          revokePreview(previewUrlRef.current)
+        }
+        previewUrlRef.current = preview
+        setPreviewUrl(preview)
 
         const now = new Date()
         const result: AnalysisResult = {
@@ -162,12 +224,22 @@ export const AppStateProvider: React.FC<{
           privacyMessage:
             detection.privacyMessage ||
             'Your original image has been deleted from our servers. Only this analysis result was kept.',
+          // Session-only region cues for zoom explanations — omitted from History.
+          findings: detection.findings ?? [],
         }
         setCurrentResult(result)
+        // Every completed analysis is real history (metadata only — no image).
+        const safe = toHistorySafe(result)
+        setHistory((rows) => {
+          const next = rows.some((r) => r.id === safe.id) ? rows : [safe, ...rows]
+          persistHistory(userIdRef.current, next)
+          return next
+        })
         setAnalysisStage('completed')
       } catch (err) {
         setAnalysisStage('failed')
         revokePreview(preview)
+        if (previewUrlRef.current === preview) previewUrlRef.current = null
         setPreviewUrl(null)
 
         const aborted =
@@ -195,7 +267,7 @@ export const AppStateProvider: React.FC<{
         sortOrder,
         setSortOrder,
         sortedHistory,
-        deleteResult: (id) => setHistory((rows) => rows.filter((r) => r.id !== id)),
+        deleteResult,
         currentResult,
         previewUrl,
         analyzing,
