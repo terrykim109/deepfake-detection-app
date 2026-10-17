@@ -8,17 +8,15 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Seed data is hardcoded in `src/data/mock.ts` and the verdict comes from
-`src/detection/mockDetector.ts` — no backend calls yet. Copy, scores and
-timestamps are transcribed from the design frames.
+Upload tips live in `src/data/mock.ts` (shared copy helpers). Live analysis
+goes through `httpDetector` → the backend `/api/analysis/run` path.
 
 Detection sits behind the `Detector` interface in
 `src/detection/detector.ts`: `analyze(file, signal) → Promise<Detection>`,
-which may reject and honours cancellation. `mockDetector` is the only
-adapter today; the HTTP adapter that calls the backend drops in beside it
-and is injected via `<AppStateProvider detector={…}>`. A `Detection`
-carries only verdict, label, confidence and summary — the app stamps id,
-fileName and timestamps when it commits the run.
+which may reject and honours cancellation. The HTTP adapter is injected via
+`<AppStateProvider detector={…}>`. A `Detection` carries verdict, label,
+confidence and summary — the app stamps id, fileName and timestamps when it
+commits the run.
 
 `AnalysisResult` carries **two** time fields and they must stay in sync:
 `timestamp` is the display string worded exactly as the Figma shows it,

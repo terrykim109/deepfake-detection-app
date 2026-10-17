@@ -1,6 +1,5 @@
 /* The seam between the app and whatever performs deepfake detection.
-   httpDetector calls the backend /api/analysis/run path (DFD-02).
-   mockDetector remains for offline UI work. */
+   httpDetector calls the backend /api/analysis/run path (DFD-02). */
 
 export type Verdict = 'real' | 'warn' | 'fake'
 
