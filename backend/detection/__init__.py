@@ -9,12 +9,18 @@ def get_detector() -> Detector:
     """
     Return the active detector implementation.
 
-    Today: stub (local heuristic) so the upload→backend→result path works.
-    Later: switch DETECTION_PROVIDER to a pretrained model adapter.
+    Set DETECTION_PROVIDER=openrouter (default) or stub.
+    OpenRouter requires OPENROUTER_API_KEY in the environment
+    (checked when analyze() runs).
     """
     provider = (DETECTION_PROVIDER or "stub").strip().lower()
     if provider in {"stub", "mock", "local"}:
         return StubDetector()
+
+    if provider in {"openrouter", "or", "ensemble"}:
+        from detection.openrouter import OpenRouterEnsembleDetector
+
+        return OpenRouterEnsembleDetector()
 
     # Unknown providers fall back to stub so demos keep working
     return StubDetector()

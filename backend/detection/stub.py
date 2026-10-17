@@ -61,4 +61,5 @@ class StubDetector:
             confidence=score if verdict != "real" else max(score, 55),
             summary=summary,
             provider=self.name,
+            findings=[],
         )

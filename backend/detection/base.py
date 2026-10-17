@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 
 @dataclass
@@ -13,6 +13,7 @@ class DetectionResult:
     confidence: int  # 0–100
     summary: str
     provider: str
+    findings: list[dict[str, Any]] = field(default_factory=list)
 
 
 class Detector(Protocol):

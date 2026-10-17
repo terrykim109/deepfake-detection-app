@@ -25,6 +25,17 @@ export const ANALYSIS_STAGE_LABELS: Record<AnalysisStage, string> = {
   failed: 'Analysis could not be completed',
 }
 
+/** Normalized 0–1 region cue from vision analysis (session-only). */
+export interface Finding {
+  id: string
+  label: string
+  explanation: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface Detection {
   verdict: Verdict
   verdictLabel: string
@@ -38,6 +49,8 @@ export interface Detection {
   imageDeletedAt?: string | null
   privacyMessage?: string
   createdAt?: string
+  /** Region hotspots for Results zoom; not persisted to History. */
+  findings?: Finding[]
 }
 
 export type StatusCallback = (stage: AnalysisStage) => void
