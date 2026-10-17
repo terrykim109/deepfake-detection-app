@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { IconButton } from './ui'
+import { SettingsMenu } from './SettingsMenu'
 
 export const Logo: React.FC<{ to?: string }> = ({ to = '/' }) => (
   <Link className="app-logo" to={to} aria-label="Deepfake Detection home">
@@ -22,13 +23,16 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     <div className="ui-container">
       <header className="app-header">
         <Logo to="/upload" />
-        <IconButton
-          className="app-account"
-          icon="/assets/account-circle.svg"
-          label="Account"
-          onClick={() => navigate('/profile')}
-          aria-current={pathname.startsWith('/profile') ? 'page' : undefined}
-        />
+        <div className="app-header__actions">
+          <SettingsMenu />
+          <IconButton
+            className="app-account"
+            icon="/assets/account-circle.svg"
+            label="Account"
+            onClick={() => navigate('/profile')}
+            aria-current={pathname.startsWith('/profile') ? 'page' : undefined}
+          />
+        </div>
       </header>
 
       <nav className="nav-bar" aria-label="Main">

@@ -9,6 +9,7 @@ import { Profile } from './pages/Profile'
 import { Upload } from './pages/Upload'
 import { History } from './pages/History'
 import { Results } from './pages/Results'
+import { ResultDetail } from './pages/ResultDetail'
 import { StyleGuide } from './pages/StyleGuide'
 import { ForensicsTest } from './pages/ForensicsTest'
 import { FullPageSpinner } from './components/ui'
@@ -36,6 +37,7 @@ const AppRoutes: React.FC = () => (
     <Route path="/upload" element={<RequireAuth><Upload /></RequireAuth>} />
     <Route path="/results" element={<RequireAuth><Results /></RequireAuth>} />
     <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
+    <Route path="/result/:id" element={<RequireAuth><ResultDetail /></RequireAuth>} />
     {/* Temporary - TODO: requires UX flow ideas in implementing */}
     <Route path="/forensics-test" element={<RequireAuth><ForensicsTest /></RequireAuth>} />
     {/* Design-system reference for the team — public, not linked in the nav */}

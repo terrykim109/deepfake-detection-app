@@ -5,6 +5,19 @@
     <link rel="icon" type="image/png" href="/assets/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Deepfake Detection</title>
+    <!-- Apply saved theme / text size before first paint (see src/state/usePreferences.ts) -->
+    <script>
+      (function () {
+        var d = document.documentElement, t, s;
+        try { t = localStorage.getItem('dfd.theme'); s = localStorage.getItem('dfd.fontScale'); } catch (e) {}
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        d.dataset.theme = t;
+        if (['112.5', '125', '137.5', '150'].indexOf(s) > -1) d.style.fontSize = s + '%';
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" />
   </head>
   <body>
     <div id="root"></div>

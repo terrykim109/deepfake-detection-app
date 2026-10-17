@@ -21,10 +21,13 @@
 }
 .ui-btn:disabled { opacity: 0.45; }
 
-.ui-btn--sm { padding: 10px 16px; font-size: var(--fs-sm); min-height: 40px; }
-.ui-btn--md { padding: 14px 24px; min-height: 48px; }
-.ui-btn--lg { padding: 18px 28px; min-height: 64px; }
+.ui-btn--sm { padding: 6px 12px; font-size: var(--fs-sm); min-height: 32px; }
+.ui-btn--md { padding: 10px 20px; min-height: 40px; }
+.ui-btn--lg { padding: 12px 24px; min-height: 48px; }
 .ui-btn--block { width: 100%; }
+@media (max-width: 767px) {
+  .ui-btn { white-space: normal; }
+}
 
 .ui-btn--primary { background: var(--btn-dark); color: #fff; }
 .ui-btn--primary:not(:disabled):hover { background: var(--btn-dark-hover); }
@@ -48,7 +51,7 @@
 }
 
 .ui-btn .ui-spinner { border-color: rgba(255, 255, 255, 0.35); border-top-color: currentColor; }
-.ui-btn--ghost .ui-spinner { border-color: rgba(93, 105, 120, 0.25); border-top-color: var(--primary); }
+.ui-btn--ghost .ui-spinner { border-color: color-mix(in srgb, var(--secondary-text) 25%, transparent); border-top-color: var(--brand-ink); }
 
 /* ───────────── IconButton ───────────── */
 .ui-icon-btn {
@@ -60,7 +63,7 @@
   flex-shrink: 0;
   transition: background var(--transition), opacity var(--transition);
 }
-.ui-icon-btn:not(:disabled):hover { background: rgba(23, 50, 77, 0.08); }
+.ui-icon-btn:not(:disabled):hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
 .ui-icon-btn img, .ui-icon-btn svg { width: 100%; height: 100%; display: block; }
 .ui-icon-btn--sm { width: 36px; height: 36px; }
 .ui-icon-btn--md { width: 44px; height: 44px; }
@@ -96,7 +99,7 @@
   letter-spacing: 0.06em;
   padding: 8px 0 12px;
 }
-.ui-field--underline .ui-field__input:focus { border-bottom-color: var(--primary); box-shadow: 0 1px 0 var(--primary); }
+.ui-field--underline .ui-field__input:focus { border-bottom-color: var(--brand-ink); box-shadow: 0 1px 0 var(--brand-ink); }
 
 /* filled — profile / forms */
 .ui-field--filled .ui-field__input {
@@ -114,8 +117,8 @@
 .ui-field__toggle { position: absolute; right: 0; }
 .ui-field--filled .ui-field__toggle { right: 4px; }
 
-.ui-field__hint { font-size: 13px; color: var(--secondary-text); }
-.ui-field__error { font-size: 13px; color: var(--alert-error-fg); font-weight: 500; }
+.ui-field__hint { font-size: 0.8125rem; color: var(--secondary-text); }
+.ui-field__error { font-size: 0.8125rem; color: var(--alert-error-fg); font-weight: 500; }
 
 .ui-field--invalid .ui-field__input { border-color: var(--error); }
 
@@ -149,6 +152,7 @@
 .ui-card--pad-lg { padding: clamp(var(--space-5), 5vw, var(--space-8)); }
 .ui-card--interactive { cursor: pointer; transition: box-shadow var(--transition), border-color var(--transition); }
 .ui-card--interactive:hover { border-color: #b9c8db; box-shadow: var(--shadow-sm); }
+:root[data-theme='dark'] .ui-card--interactive:hover { border-color: var(--muted-fill); }
 
 /* ───────────── Alert ───────────── */
 .ui-alert {
@@ -172,8 +176,8 @@
 .ui-spinner {
   display: inline-block;
   border-style: solid;
-  border-color: rgba(93, 105, 120, 0.25);
-  border-top-color: var(--primary);
+  border-color: color-mix(in srgb, var(--secondary-text) 25%, transparent);
+  border-top-color: var(--brand-ink);
   border-radius: 50%;
   animation: ui-spin 0.9s linear infinite;
   flex-shrink: 0;
@@ -213,7 +217,7 @@
 .ui-score {
   --dial-fg: var(--text);
   --dial-bg: var(--placeholder);
-  width: clamp(150px, 16vw, 213px);
+  width: clamp(128px, 11vw, 160px);
   aspect-ratio: 213 / 174;
   border-radius: 50%;
   background: var(--dial-bg);
@@ -224,7 +228,7 @@
   flex-shrink: 0;
   color: var(--dial-fg);
 }
-.ui-score__value { font-size: clamp(52px, 5.5vw, 80px); font-weight: 700; line-height: 1; }
+.ui-score__value { font-size: clamp(40px, 3.6vw, 52px); font-weight: 700; line-height: 1; }
 .ui-score__value small { font-size: 0.4em; font-weight: 700; margin-left: 2px; }
 .ui-score__label { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
 .ui-score--real { --dial-fg: var(--verdict-real-fg); --dial-bg: var(--verdict-real-bg); }
@@ -257,7 +261,7 @@
 .ui-toast__icon { width: 22px; height: 22px; flex-shrink: 0; }
 .ui-toast--success .ui-toast__icon { color: var(--successful); }
 .ui-toast--error .ui-toast__icon { color: var(--error); }
-.ui-toast--info .ui-toast__icon { color: var(--primary); }
+.ui-toast--info .ui-toast__icon { color: var(--brand-ink); }
 @keyframes ui-toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
 
 /* ───────────── PageHeader ───────────── */
@@ -267,10 +271,10 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
-  padding-block: clamp(var(--space-5), 5vw, 78px) clamp(var(--space-4), 3vw, var(--space-7));
+  padding-block: clamp(var(--space-5), 3vw, var(--space-6)) clamp(var(--space-4), 2vw, var(--space-5));
 }
-.ui-page-header__title { font-size: var(--fs-3xl); font-weight: 700; color: #000; line-height: 1.15; }
-.ui-page-header__subtitle { margin-top: var(--space-2); color: var(--secondary-text); font-size: var(--fs-lg); }
+.ui-page-header__title { font-size: var(--fs-3xl); font-weight: 700; color: var(--text-strong); line-height: 1.15; }
+.ui-page-header__subtitle { margin-top: var(--space-2); color: var(--secondary-text); font-size: var(--fs-md); }
 
 /* ───────────── EmptyState ───────────── */
 .ui-empty {
@@ -296,9 +300,10 @@
   padding: var(--space-4);
   z-index: 50;
 }
+:root[data-theme='dark'] .ui-modal-backdrop { background: rgba(0, 0, 0, 0.6); }
 
 .ui-modal {
-  --modal-icon-fg: var(--primary);
+  --modal-icon-fg: var(--brand-ink);
   --modal-icon-bg: var(--subtle-bg);
   position: relative;
   width: min(440px, 100%);
@@ -361,36 +366,43 @@
 
 /* ───────────── StepIndicator ───────────── */
 .ui-steps { display: flex; align-items: center; justify-content: center; list-style: none; }
-.ui-steps__item { display: flex; align-items: center; }
+.ui-steps__item { display: flex; align-items: center; min-width: 0; }
+/* the first step has no arrow to give up, so it must not shrink */
+.ui-steps__item:first-child { flex-shrink: 0; }
 
 .ui-steps__circle {
-  width: 128px;
-  height: 115px;
+  /* rem so the circle grows with the text-size setting; sized so the
+     two-line label clears the curve of the lower half */
+  width: 7.25rem;
+  height: 6.5rem;
+  padding-inline: var(--space-2);
+  text-align: center;
   border-radius: 50%;
   background: var(--placeholder);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex-shrink: 0;
   transition: background 0.25s;
 }
 .ui-steps__item--active .ui-steps__circle { background: var(--primary); }
-.ui-steps__item--done .ui-steps__circle { background: #c3ccd8; }
-.ui-steps__circle img { width: 34px; height: 34px; filter: brightness(0) opacity(0.6); }
-.ui-steps__circle span { font-size: var(--fs-xs); font-weight: 700; color: var(--text); }
+.ui-steps__item--done .ui-steps__circle { background: var(--muted-fill); }
+.ui-steps__circle img { width: 1.75rem; height: 1.75rem; filter: brightness(0) opacity(0.6); }
+.ui-steps__circle span { font-size: var(--fs-xs); font-weight: 700; line-height: 1.3; color: var(--text); }
 /* Only the active step sits on a dark fill; others keep dark text for contrast (NFR-03). */
 .ui-steps__item--active .ui-steps__circle span { color: #fff; }
 .ui-steps__item--active .ui-steps__circle img { filter: brightness(0) invert(1); }
 
-.ui-steps__arrow { width: clamp(40px, 10vw, 155px); height: 2px; background: #000; position: relative; flex-shrink: 0; }
+/* shrinks (with the item's min-width: 0) when the row is wider than its column */
+.ui-steps__arrow { width: clamp(40px, 10vw, 155px); flex-shrink: 1; min-width: 24px; height: 2px; background: var(--text-strong); position: relative; }
 .ui-steps__arrow::after {
   content: '';
   position: absolute;
   right: -1px;
   top: -4px;
-  border-left: 9px solid #000;
+  border-left: 9px solid var(--text-strong);
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
 }
@@ -404,7 +416,99 @@
   border-radius: var(--radius-pill);
   background: var(--placeholder);
 }
-.ui-steps--compact .ui-steps__item--done .ui-steps__dot { background: #9aa6b4; }
+.ui-steps--compact .ui-steps__item--done .ui-steps__dot { background: var(--muted-fill); }
 .ui-steps--compact .ui-steps__item--active .ui-steps__dot { background: var(--primary); }
 .ui-steps--compact .ui-steps__text { font-size: var(--fs-xs); font-weight: 600; color: var(--secondary-text); }
 .ui-steps--compact .ui-steps__item--active .ui-steps__text { color: var(--text); }
+
+/* Non-active step icons are drawn dark; lift them on the dark theme. */
+:root[data-theme='dark'] .ui-steps__circle img { filter: brightness(0) invert(1) opacity(0.7); }
+/* --primary is too close to --placeholder on the dark theme; use the button blue for the current step */
+:root[data-theme='dark'] .ui-steps__item--active .ui-steps__circle,
+:root[data-theme='dark'] .ui-steps--compact .ui-steps__item--active .ui-steps__dot { background: var(--btn-dark); }
+
+/* ───────────── Dark theme: <img> icons ─────────────
+   The /assets SVGs have hard-coded #1E1E1E strokes, so recolour them
+   to light grey instead of converting each to an inline component. */
+:root[data-theme='dark'] img[src^='/assets/icon-']:not([src*='google']):not([src*='facebook']),
+:root[data-theme='dark'] img[src$='account-circle.svg'] { filter: brightness(0) invert(0.9); }
+
+/* ───────────── Switch ───────────── */
+.ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--muted-fill);
+  flex-shrink: 0;
+  transition: background var(--transition);
+}
+.ui-switch[aria-checked='true'] { background: var(--secondary); }
+.ui-switch__thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition);
+}
+.ui-switch[aria-checked='true'] .ui-switch__thumb { transform: translateX(20px); }
+.ui-switch:focus-visible { border-radius: var(--radius-pill); }
+
+/* ───────────── Settings popover (components/SettingsMenu) ───────────── */
+.ui-settings { position: relative; display: flex; }
+
+.ui-settings__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  z-index: 40;
+  width: min(20rem, calc(100vw - 2 * var(--space-4)));
+  background: var(--surface);
+  border: 1px solid var(--borders);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--text);
+}
+.ui-settings__title { font-size: var(--fs-lg); font-weight: 700; }
+
+.ui-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--borders);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.ui-settings__group { flex-wrap: wrap; }
+
+.ui-settings__stepper { display: flex; align-items: center; gap: var(--space-2); }
+.ui-settings__step {
+  min-width: 40px;
+  height: 40px;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--borders);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  transition: background var(--transition);
+}
+.ui-settings__step:not([aria-disabled='true']):hover { background: var(--subtle-bg); }
+.ui-settings__step[aria-disabled='true'] { opacity: 0.4; cursor: not-allowed; }
+.ui-settings__readout { min-width: 4.5ch; text-align: center; font-variant-numeric: tabular-nums; }
+
+.ui-settings__reset { font-size: var(--fs-sm); }
+.ui-settings__reset[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 767px) {
+  .ui-settings { position: static; }
+  .ui-settings__panel { position: fixed; left: var(--space-4); right: var(--space-4); top: clamp(64px, 6vw, 80px); width: auto; }
+}

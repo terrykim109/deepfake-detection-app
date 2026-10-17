@@ -5,6 +5,8 @@
    token over a raw value in new CSS.
    ─────────────────────────────────────────────── */
 :root {
+  color-scheme: light;
+
   /* Brand palette (Figma) */
   --primary: #17324d;
   --secondary: #2f6fed;
@@ -27,6 +29,9 @@
   --hairline: #c9c9c9;       /* underline inputs / social buttons */
   --muted-label: #6b6b6b;    /* field labels / helper links — darkened from #9d9d9d for WCAG AA (5:1) */
   --subtle-bg: #eef2f7;      /* hover fill for ghost controls */
+  --text-strong: #000;       /* Figma headings are pure black */
+  --brand-ink: var(--primary); /* --primary used as a foreground colour */
+  --muted-fill: #c3ccd8;     /* completed steps, scrollbar thumb */
 
   /* Result states — SDS §4.1.2.1 (FR-10 / BR-13) */
   --verdict-real-fg: #11704c;
@@ -64,16 +69,17 @@
   --radius-lg: 20px;
   --radius-pill: 999px;
 
-  /* Type — fluid so headings shrink on phones */
+  /* Type — 12/14/16/18/20/24/30 product-app scale; only --fs-3xl is fluid */
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
   --font-poppins: 'Poppins', var(--font-body);
-  --fs-xs: 12px;
-  --fs-sm: 14px;
-  --fs-md: 16px;
-  --fs-lg: clamp(18px, 1.2vw + 12px, 20px);
-  --fs-xl: clamp(20px, 1.6vw + 12px, 24px);
-  --fs-2xl: clamp(24px, 2.4vw + 12px, 32px);
-  --fs-3xl: clamp(30px, 3.6vw + 10px, 52px);
+  /* rem so the text-size setting (font-size on <html>) scales every token */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.5rem;
+  --fs-3xl: clamp(1.5rem, 0.5vw + 1.25rem, 1.875rem);
 
   /* Elevation */
   --shadow-sm: 0 2px 10px rgba(23, 50, 77, 0.08);
@@ -83,4 +89,55 @@
   --focus-ring: 0 0 0 3px rgba(47, 111, 237, 0.45);
 
   --transition: 0.15s ease;
+}
+
+/* ───────────────────────────────────────────────
+   Dark theme — set by data-theme on <html> (index.html script +
+   state/usePreferences.ts). Text pairs checked for WCAG AA (≥4.5:1).
+   ─────────────────────────────────────────────── */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --primary: #1d3d5e;
+  --secondary: #7aa7ff;
+  --accent: #2ec4bd;
+  --background: #0f1722;
+  --surface: #172231;
+  --text: #e6edf5;
+  --secondary-text: #a3b0c0;
+  --borders: #2c3b4e;
+  --warning: #d9b43a;
+
+  --btn-dark: #2563d6;       /* #060326 disappears on a dark page */
+  --btn-dark-hover: #1d55bf;
+  --placeholder: #2a3646;
+  --field-bg: #1b2736;
+  --hairline: #6b7c92;
+  --muted-label: #a8b3c1;
+  --subtle-bg: #223044;
+  --text-strong: #e6edf5;
+  --brand-ink: #8fb4e0;
+  --muted-fill: #3d4f66;
+
+  --verdict-real-fg: #5fd3a1;
+  --verdict-real-bg: #123326;
+  --verdict-fake-fg: #ff8a92;
+  --verdict-fake-bg: #3a1a1e;
+  --verdict-warn-fg: #f2cf5b;
+  --verdict-warn-bg: #33290c;
+  --verdict-failed-fg: #b4c0ce;
+  --verdict-failed-bg: #232d3a;
+
+  --alert-error-fg: #ff8a92;
+  --alert-error-bg: #3a1a1e;
+  --alert-success-fg: #5fd3a1;
+  --alert-success-bg: #123326;
+  --alert-info-fg: #8fb8ff;
+  --alert-info-bg: #16233f;
+  --alert-warning-fg: #f2cf5b;
+  --alert-warning-bg: #33290c;
+
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 3px rgba(122, 167, 255, 0.55);
 }
