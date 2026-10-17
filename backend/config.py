@@ -5,6 +5,16 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load gitignored .env files into the process environment.
+_BACKEND_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _BACKEND_DIR.parent
+load_dotenv(_BACKEND_DIR / ".env")
+load_dotenv(_REPO_ROOT / ".env")
+# Also accept a key kept next to the Vite env file during local dev.
+load_dotenv(_REPO_ROOT / "frontend" / ".env")
+
 SESSION_TIMEOUT_MINUTES = 30
 
 AUTH_PROVIDERS = ["local", "google"]
@@ -30,5 +40,5 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODELS = [
     "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-31b-it:free",
-    "qwen/qwen3.8-27b:free",
+    "openrouter/free",
 ]
