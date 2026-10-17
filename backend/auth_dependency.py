@@ -9,8 +9,6 @@ _bearer = HTTPBearer(auto_error=False)
 async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict:
-    print(f"[auth] scheme={creds.scheme if creds else None} token_len={len(creds.credentials) if creds else 0}")
-   
     if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
 
@@ -22,8 +20,16 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token revoked")
     except auth.InvalidIdTokenError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
-    except Exception:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token verification failed")
+    except Exception as exc:
+        if type(exc).__name__ == "CertificateFetchError":
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Could not verify token (certificate fetch failed)",
+            ) from exc
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            f"Token verification failed: {type(exc).__name__}",
+        ) from exc
 
     uid = decoded["uid"]
 

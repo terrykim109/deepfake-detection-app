@@ -1,8 +1,9 @@
 #main.py
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth_dependency import get_current_user
 from firebase_config import db
 from routers import auth
 from routers import users
@@ -17,7 +18,13 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
     expose_headers=["*"],
     max_age=600,
 )
@@ -40,6 +47,15 @@ async def health():
         return {"status": "ok", "database": "connected", "type": "firebase-firestore"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+
+
+@app.get("/api/me")
+async def me(user: dict = Depends(get_current_user)):
+    """Smoke-test: requires a valid Firebase ID token."""
+    return {
+        "uid": user["uid"],
+        "claims": user["claims"],
+    }
 
 if __name__ == "__main__":
     import uvicorn

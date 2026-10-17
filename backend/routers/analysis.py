@@ -168,6 +168,7 @@ async def run_analysis(
             "file_name": filename or "upload",
             "created_at": now_iso(),
             "provider": detection.provider,
+            "findings": getattr(detection, "findings", None) or [],
         },
         "image": deletion,
         "privacy": {

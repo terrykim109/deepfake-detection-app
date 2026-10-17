@@ -72,6 +72,7 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
           imageStoredAt: privacy?.stored_at ?? null,
           imageDeletedAt: privacy?.deleted_at ?? null,
           privacyMessage: privacy?.message,
+          findings: Array.isArray(result.findings) ? result.findings : [],
         }
       } catch (err) {
         window.clearTimeout(analyzingTimer)

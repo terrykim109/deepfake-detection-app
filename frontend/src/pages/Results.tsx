@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
+import { ImageZoom } from '../components/ImageZoom'
 import { useAppState } from '../state/AppState'
 import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
 
@@ -12,11 +13,11 @@ const DISCLAIMER =
 
 /* Figma frame "Image Results" (node 3:4).
 
-   After analysis the original image is deleted (FR-12). This screen shows
-   the result only, plus an explicit privacy confirmation. */
+   After analysis the original image is deleted from our servers (FR-12).
+   A session-only local preview remains so the user can inspect/zoom. */
 export const Results: React.FC = () => {
   const navigate = useNavigate()
-  const { currentResult, saveResult, isSaved, clearAnalysis } = useAppState()
+  const { currentResult, previewUrl, saveResult, isSaved, clearAnalysis } = useAppState()
   const [saved, setSaved] = useState(false)
   const alreadySaved = currentResult ? isSaved(currentResult.id) : false
 
@@ -43,10 +44,23 @@ export const Results: React.FC = () => {
 
       <Card className="results-card" padding="lg">
         <div className="results-top">
-          <div className="result-thumb" aria-hidden="true">
-            <img className="icon" src="/assets/icon-image.svg" alt="" />
-            <p className="result-thumb-note">Original image removed</p>
-          </div>
+          {previewUrl ? (
+            <div className="result-preview">
+              <ImageZoom
+                src={previewUrl}
+                alt={currentResult.fileName}
+                findings={currentResult.findings}
+              />
+              <p className="result-preview-note">
+                Temporary local preview for inspection — not stored on our servers.
+              </p>
+            </div>
+          ) : (
+            <div className="result-thumb" aria-hidden="true">
+              <img className="icon" src="/assets/icon-image.svg" alt="" />
+              <p className="result-thumb-note">Original image removed</p>
+            </div>
+          )}
 
           <div className="results-summary">
             <VerdictBadge verdict={currentResult.verdict} label={currentResult.verdictLabel} />
@@ -75,6 +89,9 @@ export const Results: React.FC = () => {
 
         <Alert tone="success" icon={<TrashCheckIcon className="ui-alert__icon" />} className="privacy-note">
           {privacyText}
+          {previewUrl
+            ? ' A temporary local preview is shown above so you can zoom and inspect details; it is discarded when you leave this screen.'
+            : null}
           {currentResult.imageDeletedAt ? (
             <span className="privacy-meta">
               Deleted at {new Date(currentResult.imageDeletedAt).toLocaleString()}
