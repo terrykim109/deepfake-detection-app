@@ -306,7 +306,7 @@
 .image-zoom__explain-body {
   font-size: var(--fs-sm);
   line-height: 1.45;
-  color: #000;
+  color: var(--text-strong);
 }
 .image-zoom__explain-note {
   margin-top: 6px;
