@@ -6,6 +6,8 @@ backend/venv/
 backend/__pycache__/
 backend/*.pyc
 backend/tmp_uploads/
+backend/.pytest_cache/
+__pycache__/
 
 .env
 .env.local

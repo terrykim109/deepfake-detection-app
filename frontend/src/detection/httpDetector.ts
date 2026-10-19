@@ -2,6 +2,8 @@ import { abortError, type Detection, type Detector, type StatusCallback } from '
 import { analysisApi } from '../api/client'
 import { validateUploadSelection } from '../upload/validateUpload'
 
+const VERDICTS: ReadonlyArray<Detection['verdict']> = ['real', 'warn', 'fake']
+
 /**
  * DFD-02 HTTP adapter: client validation → POST /api/analysis/run
  * (server validates again, temp-stores, runs the configured detector, deletes).
@@ -57,7 +59,20 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
 
         report('finalizing')
         const { result, privacy } = res.data
-        const verdict = (result.verdict || 'warn') as Detection['verdict']
+        // Guard the AnalysisResult contract: an unknown verdict would crash VerdictBadge
+        const verdict = result.verdict as Detection['verdict']
+        if (
+          !VERDICTS.includes(verdict) ||
+          typeof result.confidence !== 'number' ||
+          !Number.isFinite(result.confidence) ||
+          result.confidence < 0 ||
+          result.confidence > 100
+        ) {
+          report('failed')
+          throw new Error(
+            'The analysis service returned a result we could not use. Your image was deleted — please try uploading again.',
+          )
+        }
 
         report('completed')
         return {

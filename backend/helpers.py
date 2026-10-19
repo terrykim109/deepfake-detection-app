@@ -1,6 +1,9 @@
 # helpers.py
 
 from datetime import datetime, timezone
+import hashlib
+import hmac
+import os
 import uuid
 
 from firebase_config import db
@@ -15,6 +18,28 @@ def now_iso() -> str:
 def generate_id(prefix: str) -> str:
     """Generate a short unique ID with a prefix (e.g., U001, R001)."""
     return f"{prefix}{uuid.uuid4().hex[:8].upper()}"
+
+def hash_password(password: str) -> str:
+    """Return a salted PBKDF2-SHA256 hash as 'pbkdf2_sha256$iterations$salt$hash'."""
+    iterations = 600_000
+    salt = os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
+
+
+def verify_password(password: str, stored: str | None) -> bool:
+    """Check a password against hash_password() output; False if no hash is stored."""
+    try:
+        scheme, iterations, salt, expected = (stored or "").split("$")
+        if scheme != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), bytes.fromhex(salt), int(iterations)
+        )
+    except ValueError:
+        return False
+    return hmac.compare_digest(digest.hex(), expected)
+
 
 def user_from_doc(doc_id: str, data: dict | None = None) -> UserResponse:
     """Build a UserResponse from a Firestore user document."""

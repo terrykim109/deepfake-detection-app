@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Request
 from google.cloud.firestore_v1.base_query import FieldFilter
 from firebase_config import db
 
-from schemas import UserCreate, UserLogin, UserResponse, TokenResponse
-from helpers import generate_id, now_iso, log_event, user_from_doc
+from schemas import LogoutRequest, UserCreate, UserLogin, UserResponse, TokenResponse
+from helpers import generate_id, hash_password, now_iso, log_event, user_from_doc, verify_password
 from config import SESSION_TIMEOUT_MINUTES
 
 router = APIRouter(tags=["auth"])
@@ -43,6 +43,7 @@ async def signup(body: UserCreate):
         "last_name": "",
         "phone": "",
         "auth_provider": "local",
+        "password_hash": hash_password(body.password),
         "created_at": now_iso(),
         "metadata": {"source": "signup"}
     }
@@ -59,14 +60,16 @@ async def signup(body: UserCreate):
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(body: UserLogin):
     docs = users_ref.where(filter=FieldFilter("email", "==", body.email)).limit(1).get()
-    if not docs:
+    user_doc = (docs[0].to_dict() or {}) if docs else {}
+    # Same error for unknown email and wrong password; Firebase-only
+    # accounts have no password_hash and must sign in through Firebase
+    if not docs or not verify_password(body.password, user_doc.get("password_hash")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password. Please try again."
         )
 
     snap = docs[0]
-    user_doc = snap.to_dict() or {}
     # Use the Firestore document ID so later profile writes hit the same doc
     user_id = snap.id
 
@@ -79,7 +82,8 @@ async def login(body: UserLogin):
 
 
 @router.post("/auth/logout")
-async def logout(user_id: str | None = None):
+async def logout(body: LogoutRequest | None = None, user_id: str | None = None):
+    user_id = user_id or (body.user_id if body else None)
     if user_id:
         log_event("auth_logout", f"User {user_id} logged out", user_id)
     return {"message": "Logged out successfully"}

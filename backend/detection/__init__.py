@@ -1,7 +1,12 @@
 # detection/__init__.py — resolve the configured detection provider
 
 from config import DETECTION_PROVIDER
-from detection.base import Detector, DetectionError, DetectionResult
+from detection.base import (
+    Detector,
+    DetectionError,
+    DetectionResult,
+    validate_detection_output,
+)
 from detection.stub import StubDetector
 
 
@@ -25,4 +30,5 @@ __all__ = [
     "DetectionError",
     "DetectionResult",
     "get_detector",
+    "validate_detection_output",
 ]

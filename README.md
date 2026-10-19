@@ -43,7 +43,7 @@ Firestore ────────────────► Saved result metad
 - Nattharut Natvongsaku - Frontend Developer and UX/UI Designer
 - Lucy Kwak - Product Research, Backend Development, and Frontend Support
 - Terry Kim - Backend Development, System Integration, and Project Coordination
-- Trinity Ma
+- Trinity Ma - QA Engineer, Backend Developer
 
 ## Tech Stack
 
@@ -89,6 +89,8 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Before running, download a Firebase service account key (Firebase Console → Project settings → Service accounts) and save it as `backend/serviceAccountKey.json`. It is git-ignored; never commit it. Remember to activate the virtual environment in every new terminal, or `python main.py` will fail with `No module named 'firebase_admin'`.
+
 Backend: `http://localhost:8000`
 
 ### Frontend
@@ -102,6 +104,36 @@ npm run dev
 Frontend: `http://localhost:5173`
 
 The Vite development server proxies `/api` requests to the backend.
+
+### QA Tests
+
+Backend QA tests live in `backend/test/`. They use in-memory stand-ins for Firebase, so no `serviceAccountKey.json` or network connection is needed and real project data is never touched.
+
+```bash
+cd backend
+
+# Activate the virtual environment (see Backend above)
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # macOS / Linux
+
+pip install -r requirements.txt -r test/requirements.txt   # first time only
+pytest test
+```
+
+Run one file or one test:
+
+```bash
+pytest test/test_upload_workflow.py
+pytest test -k "expired"
+```
+
+| File | Covers |
+|------|--------|
+| `test_auth_session.py` | Account creation, login, logout, invalid credentials, duplicate accounts, session/token expiry |
+| `test_model_output.py` | Successful, inconclusive, null, malformed, and unsupported model outputs |
+| `test_upload_workflow.py` | Upload → validation → analysis → result, temp-image deletion, quotas |
+
+A healthy run ends with `120 passed` and no `failed`. If a test fails, rerun it alone with `-v` to see the details, e.g. `pytest test -k "wrong_password" -v`.
 
 ## Current Limitations
 

@@ -7,8 +7,9 @@ from analysis_limits import (
     mark_analysis_started,
 )
 from auth_dependency import get_current_user
-from detection import DetectionError, get_detector
+from detection import DetectionError, get_detector, validate_detection_output
 from helpers import generate_id, log_event, now_iso
+from schemas import AnalysisRunResponse
 from temp_images import delete_temp_image, get_temp_meta, store_temp_image
 from upload_validation import validate_image_upload
 
@@ -53,7 +54,7 @@ async def validate_upload(
     }
 
 
-@router.post("/analysis/run")
+@router.post("/analysis/run", response_model=AnalysisRunResponse)
 async def run_analysis(
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
@@ -108,16 +109,18 @@ async def run_analysis(
 
     detector = get_detector()
     try:
-        detection = detector.analyze(
+        raw = detector.analyze(
             image_bytes=data,
             filename=filename,
             content_type=content_type,
         )
+        # Null / malformed / unsupported output becomes a DetectionError here
+        detection = validate_detection_output(raw, provider=detector.name)
     except DetectionError as exc:
         deletion = delete_temp_image(image_id, reason="analysis_failure")
         mark_analysis_finished(uid)
         try:
-            log_event("analysis_failed", exc.message, uid, {"image_id": image_id, "provider": detector.name})
+            log_event("analysis_failed", exc.reason, uid, {"image_id": image_id, "provider": detector.name})
         except Exception:
             pass
         raise HTTPException(
