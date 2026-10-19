@@ -84,7 +84,7 @@ export const ForensicsTest: React.FC = () => {
     <AppShell>
       <PageHeader
         title="Forensics Module Test"
-        subtitle="Manual test harness for the Digital Image Forensics module — metadata/EXIF, ELA, noise analysis, and C2PA, independent of the deepfake model."
+        subtitle="TODO feat: Forensics Test"
       />
 
       <Card padding="lg" className="forensics-upload-card">
