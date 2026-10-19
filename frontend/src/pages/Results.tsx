@@ -4,8 +4,11 @@ import { AppShell } from '../components/AppShell'
 import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
 import { ImageZoom } from '../components/ImageZoom'
-import { useAppState } from '../state/AppState'
-import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
+import { ForensicsReport } from '../components/ForensicsReport'
+import { useAppState, type ForensicsStatus } from '../state/AppState'
+import type { ForensicsRunResponse } from '../api/client'
+import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, Spinner, TrashCheckIcon, VerdictBadge } from '../components/ui'
+import '../styles/forensics.css'
 
 /* Fixed advisory text required on every result (SDS §4.1.2.7, BR-12 / FR-11). */
 const DISCLAIMER =
@@ -17,7 +20,16 @@ const DISCLAIMER =
    A session-only local preview remains so the user can inspect/zoom. */
 export const Results: React.FC = () => {
   const navigate = useNavigate()
-  const { currentResult, previewUrl, saveResult, isSaved, clearAnalysis } = useAppState()
+  const {
+    currentResult,
+    previewUrl,
+    saveResult,
+    isSaved,
+    clearAnalysis,
+    forensicsStatus,
+    forensicsResult,
+    forensicsError,
+  } = useAppState()
   const [saved, setSaved] = useState(false)
   const alreadySaved = currentResult ? isSaved(currentResult.id) : false
 
@@ -87,6 +99,12 @@ export const Results: React.FC = () => {
           </div>
         </div>
 
+        <ForensicsDisclosure
+          status={forensicsStatus}
+          result={forensicsResult}
+          error={forensicsError}
+        />
+
         <Alert tone="success" icon={<TrashCheckIcon className="ui-alert__icon" />} className="privacy-note">
           {privacyText}
           {previewUrl
@@ -120,5 +138,58 @@ export const Results: React.FC = () => {
         />
       )}
     </AppShell>
+  )
+}
+
+/* Independent Digital Image Forensics engine (metadata/EXIF, ELA, noise,
+   C2PA) — runs in parallel with the deepfake detector from the same
+   upload (see AppState.runAnalysis) and is never required to view the
+   main verdict above. Collapsed by default; expanding it reveals
+   whatever state the parallel run is currently in. */
+const ForensicsDisclosure: React.FC<{
+  status: ForensicsStatus
+  result: ForensicsRunResponse | null
+  error: string | null
+}> = ({ status, result, error }) => {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Card padding="lg" className="forensics-disclosure">
+      <button
+        type="button"
+        className="forensics-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="forensics-toggle-title">
+          Forensics details
+          {status === 'running' && <Spinner size="sm" label="Running forensics checks" />}
+        </span>
+        <span className="forensics-toggle-icon" aria-hidden="true">
+          {open ? '−' : '+'}
+        </span>
+      </button>
+
+      {open && (
+        <div className="forensics-disclosure-body">
+          {status === 'running' && (
+            <p className="forensics-hint">
+              Running metadata, ELA, noise, and C2PA checks…
+            </p>
+          )}
+          {status === 'failed' && (
+            <Alert tone="warning">
+              {error || 'The forensics service did not return a result.'}
+            </Alert>
+          )}
+          {status === 'completed' && result && (
+            <ForensicsReport forensics={result.forensics} />
+          )}
+          {status === 'idle' && (
+            <p className="forensics-hint">Forensics details are not available for this result.</p>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }

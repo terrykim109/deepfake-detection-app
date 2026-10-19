@@ -5,8 +5,15 @@ import { createHttpDetector } from '../detection/httpDetector'
 import type { AnalysisStage, Detector } from '../detection/detector'
 import { ANALYSIS_STAGE_LABELS } from '../detection/detector'
 import { validateUploadSelection } from '../upload/validateUpload'
+import { forensicsApi, type ForensicsRunResponse } from '../api/client'
 
 export type SortOrder = 'newest' | 'oldest'
+
+/* Status of the independent forensics engine (metadata/EXIF, ELA, noise,
+   C2PA). It is kicked off alongside the deepfake detector from the same
+   upload and never blocks navigation to /results — the Results page
+   shows whatever state this is in behind a collapsed-by-default card. */
+export type ForensicsStatus = 'idle' | 'running' | 'completed' | 'failed'
 
 const HISTORY_STORAGE_PREFIX = 'dfd.history.'
 
@@ -57,6 +64,10 @@ type AppStateValue = AuthState & AuthActions & {
   saveResult: (result: AnalysisResult) => void
   isSaved: (id: string) => boolean
   clearAnalysis: () => void
+  /** Independent forensics engine — runs in parallel with the deepfake detector. */
+  forensicsStatus: ForensicsStatus
+  forensicsResult: ForensicsRunResponse | null
+  forensicsError: string | null
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null)
@@ -131,8 +142,15 @@ export const AppStateProvider: React.FC<{
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle')
+  const [forensicsStatus, setForensicsStatus] = useState<ForensicsStatus>('idle')
+  const [forensicsResult, setForensicsResult] = useState<ForensicsRunResponse | null>(null)
+  const [forensicsError, setForensicsError] = useState<string | null>(null)
   const analyzingRef = useRef(false)
   const previewUrlRef = useRef<string | null>(null)
+  // Identifies the most recent forensics run so a slow response from an
+  // earlier run (e.g. a previous upload) can never overwrite a newer one.
+  const forensicsRunIdRef = useRef(0)
+  const forensicsAbortRef = useRef<AbortController | null>(null)
 
   // Load this user's real history when auth identity changes (no mock seed).
   useEffect(() => {
@@ -152,6 +170,49 @@ export const AppStateProvider: React.FC<{
     setCurrentResult(null)
     setPreviewUrl(null)
     setAnalysisStage('idle')
+    setForensicsStatus('idle')
+    setForensicsResult(null)
+    setForensicsError(null)
+  }, [])
+
+  /* Independent forensics engine (metadata/EXIF, ELA, noise, C2PA). Kicked
+     off from runAnalysis alongside the deepfake detector, from the same
+     file and abort signal — but its result is read lazily on the Results
+     page, so a slow or failed forensics pass never blocks navigation.
+
+     Each call gets a run id and its own AbortController chained to the
+     caller's signal. Starting a new run aborts whichever forensics request
+     was still in flight and tags the new one as current, so a late response
+     from an older upload can never land on top of a newer one's result —
+     this run id is also the natural join key for pairing a forensics run
+     with its deepfake counterpart later (e.g. a future combined summary). */
+  const runForensics = useCallback(async (file: File, externalSignal?: AbortSignal) => {
+    forensicsAbortRef.current?.abort()
+    const controller = new AbortController()
+    forensicsAbortRef.current = controller
+    const abortFromExternal = () => controller.abort()
+    externalSignal?.addEventListener('abort', abortFromExternal)
+
+    const runId = ++forensicsRunIdRef.current
+    const isStale = () => runId !== forensicsRunIdRef.current
+
+    try {
+      const { data, error } = await forensicsApi.run(file, controller.signal)
+      if (isStale() || controller.signal.aborted) return
+      if (error || !data) {
+        setForensicsStatus('failed')
+        setForensicsError(error || 'The forensics service did not return a result.')
+        return
+      }
+      setForensicsResult(data)
+      setForensicsStatus('completed')
+    } catch (err) {
+      if (isStale() || controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return
+      setForensicsStatus('failed')
+      setForensicsError(err instanceof Error ? err.message : 'Forensics analysis failed.')
+    } finally {
+      externalSignal?.removeEventListener('abort', abortFromExternal)
+    }
   }, [])
 
   const saveResult = useCallback(
@@ -196,6 +257,14 @@ export const AppStateProvider: React.FC<{
       analyzingRef.current = true
       setAnalyzing(true)
       setAnalysisStage('validating')
+
+      // Start the independent forensics engine in parallel, from the same
+      // upload — it shares the abort signal but is never awaited here, so
+      // it can never delay the deepfake verdict or navigation to /results.
+      setForensicsStatus('running')
+      setForensicsResult(null)
+      setForensicsError(null)
+      void runForensics(file, signal)
 
       try {
         const detection = await activeDetector.analyze(file, signal, setAnalysisStage)
@@ -256,7 +325,7 @@ export const AppStateProvider: React.FC<{
         setAnalyzing(false)
       }
     },
-    [authState.user, authState.loading, activeDetector],
+    [authState.user, authState.loading, activeDetector, runForensics],
   )
 
   return (
@@ -277,6 +346,9 @@ export const AppStateProvider: React.FC<{
         saveResult,
         isSaved,
         clearAnalysis,
+        forensicsStatus,
+        forensicsResult,
+        forensicsError,
       }}
     >
       {children}
