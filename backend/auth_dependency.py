@@ -38,15 +38,24 @@ async def get_current_user(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Email not verified")
 
     # Idempotent profile upsert so downstream code always finds a user doc
-    user_ref = db.collection("users").document(uid)
-    if not user_ref.get().exists:
-        user_ref.set({
-            "user_id": uid,
-            "email": decoded.get("email", ""),
-            "display_name": decoded.get("name") or decoded.get("email", "").split("@")[0],
-            "auth_provider": decoded.get("firebase", {}).get("sign_in_provider", "firebase"),
-            "created_at": now_iso(),
-            "metadata": {"source": "token_verify_upsert"},
-        }, merge=True)
+    try:
+        user_ref = db.collection("users").document(uid)
+        if not user_ref.get().exists:
+            user_ref.set({
+                "user_id": uid,
+                "email": decoded.get("email", ""),
+                "display_name": decoded.get("name") or decoded.get("email", "").split("@")[0],
+                "auth_provider": decoded.get("firebase", {}).get("sign_in_provider", "firebase"),
+                "created_at": now_iso(),
+                "metadata": {"source": "token_verify_upsert"},
+            }, merge=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Firestore unavailable. On Vercel, set FIREBASE_SERVICE_ACCOUNT_KEY "
+            "to your service account JSON (single-line).",
+        ) from exc
 
     return {"uid": uid, "claims": decoded}
