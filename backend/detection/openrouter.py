@@ -1,4 +1,4 @@
-# detection/openrouter.py — ensemble of free OpenRouter vision models
+# OpenRouter vision-model ensemble provider
 
 from __future__ import annotations
 
@@ -16,13 +16,11 @@ from config import OPENROUTER_API_KEY, OPENROUTER_MODELS
 from detection.base import DetectionError, DetectionResult
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-_TIMEOUT_SECONDS = 45.0
-_MAX_TOKENS = 600
-_TEMPERATURE = 0.2
-_MAX_FINDINGS = 3
-
-# Added: differences this large between model scores trigger an inconclusive result
-_DISAGREEMENT_THRESHOLD = 30
+_TIMEOUT_SECONDS = 45.0 
+_MAX_TOKENS = 600 
+_TEMPERATURE = 0.2 # Keep responses relatively consistent
+_MAX_FINDINGS = 3 # Maximum suspicious regions retained per result
+_DISAGREEMENT_THRESHOLD = 30 
 
 _PROMPT = """You are an image forensics assistant helping detect AI-generated or digitally manipulated photos.
 
@@ -70,11 +68,11 @@ class _ModelScore:
     summary: str
     findings: list[dict[str, Any]] = field(default_factory=list)
 
-
+# Keep normalized coordinates within the 0–1 range
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
-
+# Use the supplied image type, falling back to the filename or JPEG.
 def _normalize_content_type(content_type: str | None, filename: str | None) -> str:
     if content_type and content_type.startswith("image/"):
         return content_type.split(";")[0].strip().lower()
@@ -476,11 +474,14 @@ class OpenRouterEnsembleDetector:
         # Keep using any successful model results rather than failing
         # the entire analysis because one or two providers were unavailable.
         if not scores:
-            joined = "; ".join(errors[:3]) if errors else "unknown error"
-
+            # Keep technical provider errors in server logs only.
+            print(
+                "[openrouter] all models failed: "
+                + ("; ".join(errors[:3]) if errors else "unknown error")
+            )
             raise DetectionError(
-                "The vision analysis service could not complete this request. "
-                f"All models failed ({joined})."
+                "We couldn't analyze this image right now. "
+                "Please try again in a moment."
             )
 
         return _combine(scores)
