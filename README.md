@@ -4,7 +4,7 @@ A privacy-focused web application for screening images for signs of AI-generated
 
 Users can upload an image, receive a preliminary analysis, and view a confidence score with a plain-language explanation. The application is designed for everyday users, content creators, small businesses, educators, and cybersecurity professionals.
 
-> **Project status:** Core frontend and backend structure are completed. The pre-trained deepfake detection model has not yet been integrated.
+> **Project status:** Core frontend and backend structure are completed. 
 
 ## Project Goals
 
@@ -23,16 +23,19 @@ React / TypeScript
         ▼
 FastAPI / Python
         │
-        ├── Authentication
+        ├── Authentication & authorization
         ├── Image validation & temporary handling
-        ├── Image preprocessing
-        └── Pre-trained detection model
+        ├── Image encoding (Base64)
+        └── OpenRouter API
                 │
                 ▼
-        Analysis result
-        ├── Result state
-        ├── Confidence
-        └── Explanation
+        Vision model(s)
+                │
+                ▼
+        Result aggregation
+        ├── Verdict
+        ├── Confidence score
+        └── Explanation & findings
 
 Firebase Authentication ──► User access
 Firestore ────────────────► Saved result metadata
@@ -63,7 +66,7 @@ Firestore ────────────────► Saved result metad
 - Firebase Firestore
 
 **Detection**
-- Pre-trained deepfake detection model — **not yet integrated**
+- - OpenRouter vision models 
 
 ## Getting Started
 
@@ -105,11 +108,7 @@ The Vite development server proxies `/api` requests to the backend.
 
 ## Current Limitations
 
-- The deepfake detection model has not yet been integrated.
-- Model inference and final evaluation metrics are not yet available.
 - The application is a screening tool, not a forensic or identity-verification authority.
 - Detection results should not be treated as definitive proof.
 
-## Frontend Documentation
 
-See [`frontend/README.md`](frontend/README.md) for the frontend route map, design tokens, Figma references, and documented design deviations.
