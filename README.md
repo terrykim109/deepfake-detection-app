@@ -66,7 +66,7 @@ Firestore ────────────────► Saved result metad
 - Firebase Firestore
 
 **Detection**
-- - OpenRouter vision models 
+- OpenRouter vision models 
 
 ## Getting Started
 

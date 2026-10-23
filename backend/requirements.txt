@@ -9,12 +9,4 @@ numpy
 exifread
 pytest
 
-# torch
-# torchvision
-# Pillow
-# packaging
-# tqdm
-# ftfy
-# regex
-# opencv-python-headless
 
