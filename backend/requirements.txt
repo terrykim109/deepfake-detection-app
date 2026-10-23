@@ -9,4 +9,4 @@ numpy
 exifread
 pytest
 Pillow
-
+opencv-python-headless
