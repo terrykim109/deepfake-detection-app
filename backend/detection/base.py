@@ -21,11 +21,7 @@ class Detector(Protocol):
 
     name: str
 
-    def analyze(
-        self,
-        *,
-        image_bytes: bytes,
-        filename: str | None,
+    def analyze(self, *, image_bytes: bytes, filename: str | None,
         content_type: str | None,
     ) -> DetectionResult: ...
 

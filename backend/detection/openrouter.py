@@ -62,6 +62,7 @@ _FALLBACK_SUMMARIES = {
 
 @dataclass(frozen=True, slots=True)
 class _ModelScore:
+    """Store one model's assessment before ensemble aggregation."""
     model: str
     verdict: str
     confidence: int

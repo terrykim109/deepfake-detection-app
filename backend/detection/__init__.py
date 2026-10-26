@@ -1,34 +1,18 @@
-# detection/__init__.py — resolve the configured detection provider
-
 from config import DETECTION_PROVIDER
 from detection.base import Detector, DetectionError, DetectionResult
-from detection.stub import StubDetector
-
 
 def get_detector() -> Detector:
     """
-    Return the active detector implementation.
-
-    Set DETECTION_PROVIDER=openrouter (default) or stub.
-    OpenRouter requires OPENROUTER_API_KEY in the environment
-    (checked when analyze() runs).
+    Return the active detector implementation. OpenRouter requires OPENROUTER_API_KEY in the environment
     """
-    provider = (DETECTION_PROVIDER or "stub").strip().lower()
-    if provider in {"stub", "mock", "local"}:
-        return StubDetector()
+    provider_name = (DETECTION_PROVIDER or "").strip().lower() or "openrouter"
 
-    if provider in {"openrouter", "or", "ensemble"}:
-        from detection.openrouter import OpenRouterEnsembleDetector
+    if provider_name in {"openrouter", "or", "ensemble"}:
+         from detection.openrouter import OpenRouterEnsembleDetector
+         
+         return OpenRouterEnsembleDetector()
 
-        return OpenRouterEnsembleDetector()
+    raise ValueError(f"Unsupported DETECTION_PROVIDER: {provider_name!r}. " 
+                     "Expected 'openrouter', 'or', or 'ensemble'.")
 
-    # Unknown providers fall back to stub so demos keep working
-    return StubDetector()
-
-
-__all__ = [
-    "Detector",
-    "DetectionError",
-    "DetectionResult",
-    "get_detector",
-]
+__all__ = [ "Detector", "DetectionError", "DetectionResult", "get_detector" ]
