@@ -37,6 +37,10 @@ TEMP_UPLOAD_DIR = str(Path(__file__).resolve().parent / "tmp_uploads")
 # Detection: "openrouter" (ensemble) or "stub" (local heuristic)
 DETECTION_PROVIDER = os.getenv("DETECTION_PROVIDER", "openrouter")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+SCRAPPA_API_KEY = os.getenv("SCRAPPA_API_KEY", "")
+SCRAPPA_LENS_URL = os.getenv("SCRAPPA_LENS_URL", "https://scrappa.co/api/google/lens")
+# Used to make uploaded images accessible to Scrappa.
+PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or "").rstrip("/")
 OPENROUTER_MODELS = [
     # "minimax/minimax-m3.1-flash:free",
     "dots-studio/dots-3-note-preview:free", # this might be the best one.

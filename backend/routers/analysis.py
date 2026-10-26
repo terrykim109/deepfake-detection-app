@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+import asyncio
+import os
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from analysis_limits import (
     check_can_start,
@@ -7,14 +10,29 @@ from analysis_limits import (
     mark_analysis_started,
 )
 from auth_dependency import get_current_user
+from config import PUBLIC_BASE_URL
 from detection import DetectionError, get_detector
 from helpers import generate_id, log_event, now_iso
+from lens_hosting import publish_for_scrappa
+from reverse_search import reverse_image_search
 from temp_images import delete_temp_image, get_temp_meta, store_temp_image
 from upload_validation import validate_image_upload
 
 router = APIRouter(tags=["analysis"])
 
 _VALID_OUTCOMES = {"success", "failure", "cancelled"}
+
+
+def _public_base(request: Request) -> str:
+    explicit = (PUBLIC_BASE_URL or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    vercel = (os.getenv("VERCEL_URL") or "").strip().rstrip("/")
+    if vercel:
+        if vercel.startswith("http://") or vercel.startswith("https://"):
+            return vercel
+        return f"https://{vercel}"
+    return str(request.base_url).rstrip("/")
 
 
 @router.get("/analysis/usage")
@@ -55,14 +73,15 @@ async def validate_upload(
 
 @router.post("/analysis/run")
 async def run_analysis(
+    request: Request,
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
 ):
     """
-    DFD-02 end-to-end: validate → temp store → detect → delete → return result.
+    DFD-02 end-to-end: validate → temp store → detect + reverse search in parallel → delete.
 
-    One request represents one analysis for the authenticated user.
-    The temporary image is deleted on success, provider failure, or unexpected errors.
+    Deepfake detection and Scrappa online search run independently. Failure of one
+    does not block the other. The temporary image is deleted after both finish.
     """
     uid = user["uid"]
     data = await file.read()
@@ -96,6 +115,7 @@ async def run_analysis(
             data=data,
         )
         image_id = stored["image_id"]
+        access_token = stored["access_token"]
     except Exception as exc:
         mark_analysis_finished(uid)
         raise HTTPException(
@@ -107,59 +127,99 @@ async def run_analysis(
         ) from exc
 
     detector = get_detector()
-    try:
-        detection = detector.analyze(
+
+    def _detect():
+        return detector.analyze(
             image_bytes=data,
             filename=filename,
             content_type=content_type,
         )
-    except DetectionError as exc:
-        deletion = delete_temp_image(image_id, reason="analysis_failure")
-        mark_analysis_finished(uid)
-        try:
-            log_event("analysis_failed", exc.message, uid, {"image_id": image_id, "provider": detector.name})
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                f"{exc.message} Your original image has been deleted. "
-                "Please try uploading again when the service is available."
-            ),
-        ) from exc
-    except Exception as exc:
-        deletion = delete_temp_image(image_id, reason="analysis_failure")
-        mark_analysis_finished(uid)
-        try:
-            log_event("analysis_failed", str(exc), uid, {"image_id": image_id})
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "The analysis service could not complete this request. "
-                "Your original image has been deleted — please try uploading again."
-            ),
-        ) from exc
 
-    deletion = delete_temp_image(image_id, reason="analysis_success")
+    async def _run_detection():
+        try:
+            result = await asyncio.to_thread(_detect)
+            return {"ok": True, "detection": result, "error": None}
+        except DetectionError as exc:
+            return {"ok": False, "detection": None, "error": exc.message}
+        except Exception:
+            return {
+                "ok": False,
+                "detection": None,
+                "error": (
+                    "The analysis service could not complete this request. "
+                    "Please try uploading again when the service is available."
+                ),
+            }
+
+    async def _run_online_search():
+        cleanup_lens = None
+        try:
+            lens_url, cleanup_lens = await publish_for_scrappa(
+                image_id=image_id,
+                data=data,
+                content_type=content_type,
+                access_token=access_token,
+                public_base_url=_public_base(request),
+                filename=filename,
+            )
+            return await reverse_image_search(lens_url)
+        except Exception as exc:
+            from reverse_search import ONLINE_SEARCH_DISCLAIMER
+
+            return {
+                "status": "error",
+                "total_count": 0,
+                "exact_count": 0,
+                "visual_count": 0,
+                "related_count": 0,
+                "results": [],
+                "error": f"Online search could not prepare the image URL: {exc}",
+                "disclaimer": ONLINE_SEARCH_DISCLAIMER,
+            }
+        finally:
+            if cleanup_lens is not None:
+                try:
+                    cleanup_lens()
+                except Exception:
+                    pass
+
+    try:
+        detection_out, online_search = await asyncio.gather(
+            _run_detection(),
+            _run_online_search(),
+        )
+    finally:
+        deletion = delete_temp_image(image_id, reason="analysis_complete")
+
     usage = mark_analysis_finished(uid)
     result_id = generate_id("R")
 
-    try:
-        log_event(
-            "analysis_success",
-            f"Analysis {result_id} completed via {detection.provider}",
-            uid,
-            {"image_id": image_id, "verdict": detection.verdict, "confidence": detection.confidence},
-        )
-    except Exception:
-        pass
+    detection_ok = bool(detection_out.get("ok") and detection_out.get("detection"))
+    search_ok = online_search.get("status") in {"ok", "empty"}
 
-    return {
-        "ok": True,
-        "status": "completed",
-        "result": {
+    if not detection_ok and not search_ok:
+        try:
+            log_event(
+                "analysis_failed",
+                detection_out.get("error") or "both pipelines failed",
+                uid,
+                {"image_id": image_id, "online_search": online_search.get("status")},
+            )
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"{detection_out.get('error') or 'Analysis failed.'} "
+                "Your original image has been deleted. Please try uploading again."
+            ),
+        )
+
+    result_payload = None
+    detection_error = None
+    if detection_ok:
+        detection = detection_out["detection"]
+        result_payload = {
             "id": result_id,
             "verdict": detection.verdict,
             "verdict_label": detection.verdict_label,
@@ -169,7 +229,40 @@ async def run_analysis(
             "created_at": now_iso(),
             "provider": detection.provider,
             "findings": getattr(detection, "findings", None) or [],
-        },
+        }
+        try:
+            log_event(
+                "analysis_success",
+                f"Analysis {result_id} completed via {detection.provider}",
+                uid,
+                {
+                    "image_id": image_id,
+                    "verdict": detection.verdict,
+                    "confidence": detection.confidence,
+                    "online_search": online_search.get("status"),
+                    "online_total": online_search.get("total_count"),
+                },
+            )
+        except Exception:
+            pass
+    else:
+        detection_error = detection_out.get("error") or "Deepfake detection could not be completed."
+        try:
+            log_event(
+                "analysis_partial",
+                detection_error,
+                uid,
+                {"image_id": image_id, "online_search": online_search.get("status")},
+            )
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "status": "completed" if detection_ok else "partial",
+        "result": result_payload,
+        "detection_error": detection_error,
+        "online_search": online_search,
         "image": deletion,
         "privacy": {
             "image_deleted": True,
@@ -183,7 +276,7 @@ async def run_analysis(
             "lifetime_seconds": deletion.get("lifetime_seconds"),
         },
         "usage": usage,
-        "provider": detection.provider,
+        "provider": result_payload.get("provider") if result_payload else None,
     }
 
 
@@ -230,11 +323,14 @@ async def start_analysis(
             ),
         ) from exc
 
+    # Never expose access_token to the browser
+    client_image = {k: v for k, v in stored.items() if k != "access_token"}
+
     return {
         "ok": True,
         "status": "processing",
         "usage": usage,
-        "image": stored,
+        "image": client_image,
         "privacy": {
             "temporary_only": True,
             "max_retention_seconds": stored["max_retention_seconds"],
