@@ -30,8 +30,19 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 def _dir() -> Path:
     root = Path(TEMP_UPLOAD_DIR)
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        # Probe writability (Vercel package dirs are read-only).
+        probe = root / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return root
+    except OSError:
+        import tempfile
+
+        fallback = Path(tempfile.gettempdir()) / "dfd_tmp_uploads"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
 
 
 def _meta_path(image_id: str) -> Path:
