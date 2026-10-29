@@ -28,7 +28,21 @@ FORMAT_HELP = "Please choose a JPG, JPEG, PNG, or WEBP image under 10 MB."
 
 # Temporary image handling — never retain longer than this
 MAX_TEMP_IMAGE_SECONDS = 60
-TEMP_UPLOAD_DIR = str(Path(__file__).resolve().parent / "tmp_uploads")
+
+
+def _default_temp_upload_dir() -> str:
+    """Local: backend/tmp_uploads. Vercel/serverless: writable /tmp only."""
+    explicit = (os.getenv("TEMP_UPLOAD_DIR") or "").strip()
+    if explicit:
+        return explicit
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        import tempfile
+
+        return str(Path(tempfile.gettempdir()) / "dfd_tmp_uploads")
+    return str(Path(__file__).resolve().parent / "tmp_uploads")
+
+
+TEMP_UPLOAD_DIR = _default_temp_upload_dir()
 
 # Detection: OpenRouter ensemble only
 DETECTION_PROVIDER = os.getenv("DETECTION_PROVIDER", "openrouter")
