@@ -1,10 +1,35 @@
-import { abortError, type Detection, type Detector, type StatusCallback } from './detector'
-import { analysisApi } from '../api/client'
+import { abortError, type Detection, type Detector, type OnlineSearchInfo, type StatusCallback } from './detector'
+import { analysisApi, type OnlineSearchPayload } from '../api/client'
 import { validateUploadSelection } from '../upload/validateUpload'
+
+function mapOnlineSearch(payload?: OnlineSearchPayload | null): OnlineSearchInfo | null {
+  if (!payload) return null
+  return {
+    status: payload.status,
+    totalCount: payload.total_count ?? 0,
+    exactCount: payload.exact_count ?? 0,
+    visualCount: payload.visual_count ?? 0,
+    relatedCount: payload.related_count ?? 0,
+    results: Array.isArray(payload.results)
+      ? payload.results.map((row) => ({
+          title: row.title,
+          link: row.link,
+          source: row.source,
+          thumbnail: row.thumbnail,
+          matchType: row.match_type,
+          position: row.position,
+        }))
+      : [],
+    error: payload.error,
+    disclaimer:
+      payload.disclaimer ||
+      'Online search results do not establish whether an image is authentic.',
+  }
+}
 
 /**
  * DFD-02 HTTP adapter: client validation → POST /api/analysis/run
- * (server validates again, temp-stores, runs the configured detector, deletes).
+ * (server validates again, temp-stores, runs detection + reverse search, deletes).
  */
 export function createHttpDetector(getUserId: () => string | null): Detector {
   return {
@@ -31,12 +56,9 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
       if (signal?.aborted) throw abortError()
 
       report('connecting')
-      // Brief beat so the user sees "connecting" before the long request
       await new Promise((r) => setTimeout(r, 200))
 
       report('processing')
-      // Server will: validate → temp store → analyze → delete
-      // While the request is in flight we advance to analyzing shortly after
       const analyzingTimer = window.setTimeout(() => {
         if (!signal?.aborted) report('analyzing')
       }, 450)
@@ -47,7 +69,7 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
 
         if (signal?.aborted) throw abortError()
 
-        if (res.error || !res.data?.ok || !res.data.result) {
+        if (res.error || !res.data?.ok) {
           report('failed')
           throw new Error(
             res.error ||
@@ -55,10 +77,43 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
           )
         }
 
-        report('finalizing')
-        const { result, privacy } = res.data
-        const verdict = (result.verdict || 'warn') as Detection['verdict']
+        const onlineSearch = mapOnlineSearch(res.data.online_search)
+        const { result, privacy, detection_error: detectionError } = res.data
 
+        if (!result && onlineSearch?.status === 'error') {
+          report('failed')
+          throw new Error(
+            detectionError ||
+              onlineSearch.error ||
+              'The analysis service could not complete this request. Your image was deleted — please try uploading again.',
+          )
+        }
+
+        report('finalizing')
+
+        if (!result) {
+          report('completed')
+          return {
+            id: `r_${Date.now()}`,
+            verdict: 'warn',
+            verdictLabel: 'Detection unavailable',
+            confidence: 0,
+            summary:
+              detectionError ||
+              'Deepfake detection could not be completed for this image. Online search results are shown below when available.',
+            provider: res.data.provider,
+            createdAt: new Date().toISOString(),
+            imageDeleted: privacy?.image_deleted ?? true,
+            imageStoredAt: privacy?.stored_at ?? null,
+            imageDeletedAt: privacy?.deleted_at ?? null,
+            privacyMessage: privacy?.message,
+            findings: [],
+            onlineSearch,
+            detectionError: detectionError ?? null,
+          }
+        }
+
+        const verdict = (result.verdict || 'warn') as Detection['verdict']
         report('completed')
         return {
           id: result.id,
@@ -73,6 +128,8 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
           imageDeletedAt: privacy?.deleted_at ?? null,
           privacyMessage: privacy?.message,
           findings: Array.isArray(result.findings) ? result.findings : [],
+          onlineSearch,
+          detectionError: detectionError ?? null,
         }
       } catch (err) {
         window.clearTimeout(analyzingTimer)

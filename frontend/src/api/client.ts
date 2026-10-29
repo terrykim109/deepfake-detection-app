@@ -172,6 +172,28 @@ export interface AnalysisFindingPayload {
   h: number
 }
 
+export type OnlineMatchType = 'exact' | 'visual' | 'related'
+
+export interface OnlineSearchResultItem {
+  title: string
+  link: string
+  source: string
+  thumbnail: string | null
+  match_type: OnlineMatchType
+  position: number | null
+}
+
+export interface OnlineSearchPayload {
+  status: 'ok' | 'empty' | 'error'
+  total_count: number
+  exact_count: number
+  visual_count: number
+  related_count: number
+  results: OnlineSearchResultItem[]
+  error: string | null
+  disclaimer: string
+}
+
 export interface AnalysisRunResultPayload {
   id: string
   verdict: string
@@ -187,7 +209,9 @@ export interface AnalysisRunResultPayload {
 export interface AnalysisRunResponse {
   ok: boolean
   status: string
-  result?: AnalysisRunResultPayload
+  result?: AnalysisRunResultPayload | null
+  detection_error?: string | null
+  online_search?: OnlineSearchPayload
   image?: TempImageInfo
   privacy?: AnalysisPrivacy
   usage?: AnalysisUsage

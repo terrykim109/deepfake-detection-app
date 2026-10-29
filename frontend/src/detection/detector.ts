@@ -18,7 +18,7 @@ export const ANALYSIS_STAGE_LABELS: Record<AnalysisStage, string> = {
   validating: 'Checking your image…',
   connecting: 'Connecting to analysis service…',
   processing: 'Preparing a secure temporary copy…',
-  analyzing: 'Analyzing your image…',
+  analyzing: 'Running detection and online search…',
   finalizing: 'Removing the temporary image…',
   completed: 'Analysis complete',
   failed: 'Analysis could not be completed',
@@ -50,6 +50,31 @@ export interface Detection {
   createdAt?: string
   /** Region hotspots for Results zoom; not persisted to History. */
   findings?: Finding[]
+  /** Scrappa reverse image search; session-only on Results. */
+  onlineSearch?: OnlineSearchInfo | null
+  detectionError?: string | null
+}
+
+export type OnlineMatchType = 'exact' | 'visual' | 'related'
+
+export interface OnlineSearchHit {
+  title: string
+  link: string
+  source: string
+  thumbnail: string | null
+  matchType: OnlineMatchType
+  position: number | null
+}
+
+export interface OnlineSearchInfo {
+  status: 'ok' | 'empty' | 'error'
+  totalCount: number
+  exactCount: number
+  visualCount: number
+  relatedCount: number
+  results: OnlineSearchHit[]
+  error: string | null
+  disclaimer: string
 }
 
 export type StatusCallback = (stage: AnalysisStage) => void

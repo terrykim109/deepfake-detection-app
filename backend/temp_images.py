@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import shutil
 import threading
 from datetime import datetime, timedelta, timezone
@@ -55,6 +56,8 @@ def store_temp_image(
     delete_by = stored_at + timedelta(seconds=MAX_TEMP_IMAGE_SECONDS)
     path = _file_path(image_id, filename or "upload.bin")
 
+    access_token = secrets.token_urlsafe(32)
+
     with _lock:
         path.write_bytes(data)
         meta = {
@@ -64,6 +67,7 @@ def store_temp_image(
             "content_type": content_type or "application/octet-stream",
             "size": len(data),
             "path": str(path),
+            "access_token": access_token,
             "stored_at": stored_at.isoformat(),
             "delete_by": delete_by.isoformat(),
             "deleted_at": None,
@@ -86,6 +90,8 @@ def store_temp_image(
         "stored_at": meta["stored_at"],
         "delete_by": meta["delete_by"],
         "max_retention_seconds": MAX_TEMP_IMAGE_SECONDS,
+        # Returned only to the analysis pipeline — never to the browser client.
+        "access_token": access_token,
     }
 
 

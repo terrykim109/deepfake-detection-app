@@ -1,7 +1,3 @@
-# Upload / analysis limits (SDS FR-06–08, FR-16–17)
-# Temporary image retention (SDS FR-12 / BR-04)
-# Detection provider (DFD-02)
-
 import os
 from pathlib import Path
 
@@ -34,14 +30,18 @@ FORMAT_HELP = "Please choose a JPG, JPEG, PNG, or WEBP image under 10 MB."
 MAX_TEMP_IMAGE_SECONDS = 60
 TEMP_UPLOAD_DIR = str(Path(__file__).resolve().parent / "tmp_uploads")
 
-# Detection: "openrouter" (ensemble) or "stub" (local heuristic)
+# Detection: OpenRouter ensemble only
 DETECTION_PROVIDER = os.getenv("DETECTION_PROVIDER", "openrouter")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+SCRAPPA_API_KEY = os.getenv("SCRAPPA_API_KEY", "")
+SCRAPPA_LENS_URL = os.getenv("SCRAPPA_LENS_URL", "https://scrappa.co/api/google/lens")
+# Optional fallback origin if temporary HTTPS upload hosting fails
+PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or "").rstrip("/")
 OPENROUTER_MODELS = [
     # "minimax/minimax-m3.1-flash:free",
     "dots-studio/dots-3-note-preview:free", # this might be the best one.
     "nvidia/nemotron-3.5-super-vl:free",
-    # "google/gemma-4-26b-a4b-it:free",  
+    # "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-31b-it:free",
     "openrouter/free",
 ]

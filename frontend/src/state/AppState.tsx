@@ -226,6 +226,9 @@ export const AppStateProvider: React.FC<{
             'Your original image has been deleted from our servers. Only this analysis result was kept.',
           // Session-only region cues for zoom explanations — omitted from History.
           findings: detection.findings ?? [],
+          // Session-only reverse image search — omitted from History.
+          onlineSearch: detection.onlineSearch ?? null,
+          detectionError: detection.detectionError ?? null,
         }
         setCurrentResult(result)
         // Every completed analysis is real history (metadata only — no image).
