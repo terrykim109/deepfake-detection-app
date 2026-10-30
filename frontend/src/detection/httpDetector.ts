@@ -78,9 +78,13 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
         }
 
         const onlineSearch = mapOnlineSearch(res.data.online_search)
+        const forensics = res.data.forensics ?? null
         const { result, privacy, detection_error: detectionError } = res.data
 
-        if (!result && onlineSearch?.status === 'error') {
+        // A 200 response with no detection result and a failed online search is
+        // only a hard failure if forensics also has nothing to show — otherwise
+        // the forensics-only result below still has something worth surfacing.
+        if (!result && onlineSearch?.status === 'error' && !forensics) {
           report('failed')
           throw new Error(
             detectionError ||
@@ -110,6 +114,7 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
             findings: [],
             onlineSearch,
             detectionError: detectionError ?? null,
+            forensics,
           }
         }
 
@@ -130,6 +135,7 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
           findings: Array.isArray(result.findings) ? result.findings : [],
           onlineSearch,
           detectionError: detectionError ?? null,
+          forensics,
         }
       } catch (err) {
         window.clearTimeout(analyzingTimer)

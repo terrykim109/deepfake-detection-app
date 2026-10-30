@@ -212,6 +212,7 @@ export interface AnalysisRunResponse {
   result?: AnalysisRunResultPayload | null
   detection_error?: string | null
   online_search?: OnlineSearchPayload
+  forensics?: ForensicsResult | null
   image?: TempImageInfo
   privacy?: AnalysisPrivacy
   usage?: AnalysisUsage

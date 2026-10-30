@@ -12,6 +12,7 @@ from analysis_limits import (
 from auth_dependency import get_current_user
 from config import PUBLIC_BASE_URL
 from detection import DetectionError, get_detector
+from forensics import run_forensics
 from helpers import generate_id, log_event, now_iso
 from lens_hosting import publish_for_scrappa
 from reverse_search import reverse_image_search
@@ -78,10 +79,11 @@ async def run_analysis(
     user: dict = Depends(get_current_user),
 ):
     """
-    DFD-02 end-to-end: validate → temp store → detect + reverse search in parallel → delete.
+    DFD-02 end-to-end: validate → temp store → detect + reverse search + forensics
+    in parallel → delete.
 
-    Deepfake detection and Scrappa online search run independently. Failure of one
-    does not block the other. The temporary image is deleted after both finish.
+    Deepfake detection, Scrappa online search, and the forensics feature all run independently. If one fails, 
+    it does not block the other processes. The temporary image is deleted once all three parts finish. 
     """
     uid = user["uid"]
     data = await file.read()
@@ -183,10 +185,17 @@ async def run_analysis(
                 except Exception:
                     pass
 
+    async def _run_forensics():
+        try:
+            return await asyncio.to_thread(run_forensics, data, filename)
+        except Exception:
+            return None
+
     try:
-        detection_out, online_search = await asyncio.gather(
+        detection_out, online_search, forensics_out = await asyncio.gather(
             _run_detection(),
             _run_online_search(),
+            _run_forensics(),
         )
     finally:
         deletion = delete_temp_image(image_id, reason="analysis_complete")
@@ -196,14 +205,19 @@ async def run_analysis(
 
     detection_ok = bool(detection_out.get("ok") and detection_out.get("detection"))
     search_ok = online_search.get("status") in {"ok", "empty"}
+    forensics_ok = bool(forensics_out)
 
-    if not detection_ok and not search_ok:
+    if not detection_ok and not search_ok and not forensics_ok:
         try:
             log_event(
                 "analysis_failed",
-                detection_out.get("error") or "both pipelines failed",
+                detection_out.get("error") or "all pipelines failed",
                 uid,
-                {"image_id": image_id, "online_search": online_search.get("status")},
+                {
+                    "image_id": image_id,
+                    "online_search": online_search.get("status"),
+                    "forensics": "ok" if forensics_ok else "failed",
+                },
             )
         except Exception:
             pass
@@ -241,6 +255,7 @@ async def run_analysis(
                     "confidence": detection.confidence,
                     "online_search": online_search.get("status"),
                     "online_total": online_search.get("total_count"),
+                    "forensics": "ok" if forensics_ok else "failed",
                 },
             )
         except Exception:
@@ -252,7 +267,11 @@ async def run_analysis(
                 "analysis_partial",
                 detection_error,
                 uid,
-                {"image_id": image_id, "online_search": online_search.get("status")},
+                {
+                    "image_id": image_id,
+                    "online_search": online_search.get("status"),
+                    "forensics": "ok" if forensics_ok else "failed",
+                },
             )
         except Exception:
             pass
@@ -263,6 +282,7 @@ async def run_analysis(
         "result": result_payload,
         "detection_error": detection_error,
         "online_search": online_search,
+        "forensics": forensics_out,
         "image": deletion,
         "privacy": {
             "image_deleted": True,

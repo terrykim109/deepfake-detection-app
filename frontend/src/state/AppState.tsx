@@ -229,6 +229,8 @@ export const AppStateProvider: React.FC<{
           // Session-only reverse image search — omitted from History.
           onlineSearch: detection.onlineSearch ?? null,
           detectionError: detection.detectionError ?? null,
+          // Session-only forensics (heavy base64 heatmaps) — omitted from History.
+          forensics: detection.forensics ?? null,
         }
         setCurrentResult(result)
         // Every completed analysis is real history (metadata only — no image).

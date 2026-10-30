@@ -5,8 +5,10 @@ import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
 import { ImageZoom } from '../components/ImageZoom'
 import { OnlineSearchPanel } from '../components/OnlineSearchPanel'
+import { ForensicsPanel } from '../components/ForensicsPanel'
 import { useAppState } from '../state/AppState'
 import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
+import '../styles/forensicsTest.css'
 
 /* Fixed advisory text required on every result (SDS §4.1.2.7, BR-12 / FR-11). */
 const DISCLAIMER =
@@ -114,6 +116,13 @@ export const Results: React.FC = () => {
           <StepIndicator step={3} />
         </div>
       </Card>
+
+      {currentResult.forensics && (
+        <details className="ui-card ui-card--pad-lg forensics-disclosure">
+          <summary className="forensics-disclosure__summary">Forensics</summary>
+          <ForensicsPanel forensics={currentResult.forensics} />
+        </details>
+      )}
 
       {saved && (
         <Modal
