@@ -116,68 +116,234 @@
   .auth-main { max-width: none; padding-top: var(--space-6); }
 }
 
-/* ───────────── Upload ───────────── */
-.upload-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 739px) minmax(260px, 335px);
-  justify-content: center;
-  gap: clamp(var(--space-5), 4vw, 57px);
-  align-items: start;
-}
-.upload-col { min-width: 0; }
+/* ───────────── Upload ─────────────
+   Guided card: stepper header, drop zone + facts rail, action bar (Figma
+   "Upload redesign — light + dark", direction C, with direction B's step
+   markers). Every colour is a theme token, so the dark theme needs no
+   page-specific overrides. */
 
-.upload-surface {
+/* The global box-shadow ring is under 3:1 on these light surfaces; an
+   outline with offset clears 3:1 on each of them and survives forced-colors. */
+.upload-page :focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+
+.upload-page { max-width: 1040px; margin-inline: auto; }
+
+.upload-card {
+  border: 1px solid var(--borders);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.upload-steps {
+  list-style: none;
+  display: flex;
+  gap: var(--space-3);
+  padding: 20px var(--space-6);
+  background: var(--background);
+  border-bottom: 1px solid var(--borders);
+}
+.upload-steps__step { flex: 1 1 0; min-width: 0; display: flex; align-items: flex-start; gap: var(--space-3); }
+.upload-steps__step:last-child { flex: 0 1 auto; }
+.upload-steps__step:not(:last-child)::after {
+  content: '';
+  flex: 1 0 24px;
+  height: 2px;
+  margin-top: 15px; /* centred on the 32px marker */
+  border-radius: 1px;
+  background: var(--borders);
+}
+.upload-steps__step.is-done::after { background: var(--accent-ink); }
+.upload-steps__marker {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--borders);
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--secondary-text);
+}
+.upload-steps__marker svg { width: 18px; height: 18px; }
+.upload-steps__step.is-active .upload-steps__marker { border: 2px solid var(--secondary); background: var(--alert-info-bg); color: var(--alert-info-fg); font-weight: 700; }
+.upload-steps__step.is-done .upload-steps__marker { border-color: transparent; background: var(--accent-soft-bg); color: var(--accent-ink); }
+.upload-steps__text { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
+.upload-steps__name { font-size: var(--fs-md); font-weight: 600; line-height: 1.375; color: var(--text); }
+.upload-steps__step.is-todo .upload-steps__name { font-weight: 500; color: var(--secondary-text); }
+.upload-steps__desc { font-size: var(--fs-sm); color: var(--secondary-text); }
+
+.upload-card__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--space-6);
+  align-items: start;
+  padding: var(--space-6);
+}
+.upload-card__main { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+
+.upload-drop {
   width: 100%;
-  min-height: 234px;
-  border-radius: var(--radius-md);
+  height: 340px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-5);
+  border: 2px dashed var(--drop-border);
+  border-radius: 14px;
+  background: var(--background);
   text-align: center;
-  background: color-mix(in srgb, var(--placeholder) 50%, transparent);
+  transition: border-color var(--transition), background var(--transition);
+}
+.upload-drop:hover { border-color: var(--secondary); }
+.upload-card__main.is-dragging .upload-drop { border-style: solid; border-color: var(--secondary); background: var(--alert-info-bg); }
+.upload-card__main.has-error .upload-drop { border-color: var(--error); }
+.upload-drop__tile { display: inline-flex; padding: 14px; border-radius: 14px; background: var(--alert-info-bg); color: var(--secondary); }
+.upload-drop__tile svg { width: 28px; height: 28px; }
+.upload-drop__title { font-size: var(--fs-lg); font-weight: 600; color: var(--text); }
+.upload-drop__or { font-size: var(--fs-sm); color: var(--secondary-text); }
+/* --secondary is about 4:1 on these fills; the info ink clears 4.5:1 */
+.upload-drop__link { font-weight: 600; color: var(--alert-info-fg); }
+
+.upload-box { border: 1px solid var(--borders); border-radius: 14px; overflow: hidden; transition: border-color var(--transition); }
+.upload-card__main.is-dragging .upload-box { border-color: var(--secondary); }
+.upload-box__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 340px;
+  padding: 20px;
+  background: var(--stage-bg);
+}
+.upload-box__image { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--radius-sm); }
+
+.upload-box__progress { position: absolute; inset: 0 0 auto; height: 4px; background: var(--alert-info-bg); overflow: hidden; }
+.upload-box__progress::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: 2px;
+  background: var(--secondary);
+  animation: upload-progress 1.4s ease-in-out infinite;
+}
+@keyframes upload-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+/* base.css shortens animations to one frame, which would park the bar off-screen */
+@media (prefers-reduced-motion: reduce) {
+  .upload-box__progress::after { animation: none; left: 30%; }
 }
 
-.drop-zone {
-  cursor: pointer;
-  border: 2px dashed transparent;
-  transition: background var(--transition), border-color var(--transition);
+.upload-box__status {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 10px 14px;
+  border: 1px solid var(--borders);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
 }
-.drop-zone:hover { background: color-mix(in srgb, var(--placeholder) 72%, transparent); }
-.drop-zone.dragging { background: color-mix(in srgb, var(--secondary) 12%, transparent); border-color: var(--secondary); }
-.drop-zone-icon { width: 40px; height: 40px; opacity: 0.7; }
-.drop-zone-text { font-size: var(--fs-lg); font-weight: 400; color: var(--text-strong); }
-.drop-zone-hint { font-size: var(--fs-sm); color: var(--secondary-text); }
-.drop-zone img.preview { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: var(--radius-sm); }
-.drop-zone-file { font-size: var(--fs-sm); font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
 
-.processing-box { gap: var(--space-4); }
-.processing-text { font-size: var(--fs-lg); font-weight: 400; color: var(--text-strong); }
-.processing-stage { font-size: var(--fs-sm); color: var(--secondary-text); text-transform: capitalize; }
+.upload-file { display: flex; align-items: center; gap: var(--space-3); padding: 13px var(--space-4); border-top: 1px solid var(--borders); }
+.upload-file__icon { display: inline-flex; flex-shrink: 0; color: var(--secondary-text); }
+.upload-file__icon svg { width: 20px; height: 20px; }
+.upload-file__meta { flex: 1; min-width: 0; }
+.upload-file__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-file__detail { font-size: var(--fs-xs); color: var(--secondary-text); }
 
-.upload-steps { padding-top: var(--space-6); }
-.upload-error { margin-top: var(--space-5); }
-.upload-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); justify-content: center; padding-top: var(--space-5); }
-
-.tips-panel {
-  background: var(--placeholder);
+.upload-facts { list-style: none; display: flex; flex-direction: column; gap: 18px; }
+.upload-fact { display: flex; gap: var(--space-3); }
+.upload-fact__tile {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-md);
-  padding: var(--space-5) 30px;
+  background: var(--accent-soft-bg);
+  color: var(--accent-ink);
 }
-.tips-title { font-size: var(--fs-md); font-weight: 700; color: var(--text-strong); text-align: center; margin-bottom: var(--space-4); }
-.tips-lead { font-size: var(--fs-sm); color: var(--text-strong); margin-bottom: var(--space-4); }
-.tips-list { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
-.tip-row { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-sm); color: var(--text-strong); }
-.tip-row img { width: 24px; height: 24px; flex-shrink: 0; }
+.upload-fact__tile svg { width: 18px; height: 18px; }
+.upload-fact__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.upload-fact__body { margin-top: 2px; font-size: var(--fs-sm); color: var(--secondary-text); }
+
+.upload-rail { display: flex; flex-direction: column; gap: var(--space-4); }
+.upload-rail__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.upload-rail__note { display: flex; gap: var(--space-2); padding: var(--space-3) 14px; border-radius: 12px; background: var(--accent-soft-bg); font-size: var(--fs-sm); color: var(--text); }
+.upload-rail__note svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent-ink); }
+
+.upload-substeps { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.upload-substep { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--text); }
+.upload-substep.is-active { font-weight: 600; }
+.upload-substep.is-todo { color: var(--secondary-text); }
+.upload-substep__icon { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--accent-ink); }
+.upload-substep__icon svg { width: 16px; height: 16px; }
+.upload-substep__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-fill); }
+
+.upload-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 14px var(--space-6);
+  background: var(--background);
+  border-top: 1px solid var(--borders);
+}
+.upload-bar__info { min-width: 0; }
+.upload-bar__actions { display: flex; gap: var(--space-3); flex-shrink: 0; }
+/* No opacity fade: the default 0.45 drops the label to 3.2:1 (light) / 2.8:1 (dark) */
+.upload-cta:disabled { opacity: 1; background: var(--subtle-bg); border-color: var(--borders); color: var(--secondary-text); }
+.upload-cta:disabled .ui-spinner { border-color: color-mix(in srgb, var(--secondary-text) 25%, transparent); border-top-color: var(--secondary); }
+.upload-quota, .upload-slow { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); }
+.upload-quota { color: var(--secondary-text); }
+.upload-slow { color: var(--text); }
+.upload-quota svg, .upload-slow svg { width: 16px; height: 16px; flex-shrink: 0; }
+.upload-slow svg { color: var(--alert-warning-fg); }
 
 @media (max-width: 1023px) {
-  .upload-grid { grid-template-columns: minmax(0, 1fr); }
+  .upload-card__body { grid-template-columns: minmax(0, 1fr); }
+  .upload-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
-  .upload-actions .ui-btn { flex: 1 1 100%; }
-  .tips-panel { padding: var(--space-4); }
+  .upload-steps { gap: 0; padding: var(--space-4); }
+  .upload-steps__step,
+  .upload-steps__step:last-child { position: relative; flex: 1 1 0; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .upload-steps__step:not(:last-child)::after { position: absolute; top: 15px; left: calc(50% + 22px); right: calc(-50% + 22px); margin: 0; }
+  .upload-steps__text { padding-top: 0; }
+  .upload-steps__name { font-size: var(--fs-xs); }
+  .upload-steps__desc { display: none; }
+
+  .upload-card__body { gap: var(--space-5); padding: var(--space-4); }
+  .upload-drop, .upload-box__stage { height: 240px; }
+  .upload-box__stage { padding: var(--space-3); }
+  .upload-facts { grid-template-columns: minmax(0, 1fr); }
+  /* Keeps the action bar and slow-run note near the fold; the status chip still shows the stage */
+  .upload-rail.is-busy { display: none; }
+
+  .upload-bar { flex-direction: column; align-items: stretch; padding: var(--space-4); }
+  .upload-bar__actions .ui-btn { flex: 1; }
 }
 
 /* ───────────── Results ───────────── */
