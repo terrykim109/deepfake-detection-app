@@ -5,6 +5,7 @@ import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
 import { ImageZoom } from '../components/ImageZoom'
 import { useAppState } from '../state/AppState'
+import { LevelSummary } from '../summary/LevelSummary'
 import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
 
 /* Fixed advisory text required on every result (SDS §4.1.2.7, BR-12 / FR-11). */
@@ -86,6 +87,8 @@ export const Results: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <LevelSummary key={`${currentResult.id}:${previewUrl ?? 'no-preview'}`} result={currentResult} previewUrl={previewUrl} />
 
         <Alert tone="success" icon={<TrashCheckIcon className="ui-alert__icon" />} className="privacy-note">
           {privacyText}

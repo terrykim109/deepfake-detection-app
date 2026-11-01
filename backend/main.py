@@ -9,6 +9,7 @@ from routers import auth
 from routers import users
 from routers import analysis
 from routers import forensics
+from routers import level_summary
 from temp_images import start_temp_image_sweeper
 
 app = FastAPI(title="Deepfake Detection API")
@@ -34,6 +35,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(forensics.router, prefix="/api")
+app.include_router(level_summary.router, prefix="/api")
 
 # Purge abandoned temp uploads so nothing outlives 60 seconds
 start_temp_image_sweeper()
