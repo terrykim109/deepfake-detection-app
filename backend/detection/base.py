@@ -1,4 +1,4 @@
-# detection/base.py — pluggable deepfake detection providers
+# Shared types and interface for detection providers
 
 from __future__ import annotations
 
@@ -17,21 +17,17 @@ class DetectionResult:
 
 
 class Detector(Protocol):
-    """Backend detection adapter. Swap stub for a pretrained model later."""
+    """Interface for image detection providers"""
 
     name: str
 
-    def analyze(
-        self,
-        *,
-        image_bytes: bytes,
-        filename: str | None,
+    def analyze(self, *, image_bytes: bytes, filename: str | None,
         content_type: str | None,
     ) -> DetectionResult: ...
 
 
 class DetectionError(Exception):
-    """Raised when the configured provider cannot complete analysis."""
+    """Raised when a detection provider cannot complete analysis"""
 
     def __init__(self, message: str):
         super().__init__(message)

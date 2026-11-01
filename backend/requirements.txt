@@ -5,16 +5,8 @@ firebase-admin==6.5.0
 httpx==0.27.2
 python-dotenv==1.0.1
 
-torch
-torchvision
-Pillow
-packaging
-tqdm
-ftfy
-regex
-
 numpy
-opencv-python-headless
 exifread
-
 pytest
+Pillow
+opencv-python-headless

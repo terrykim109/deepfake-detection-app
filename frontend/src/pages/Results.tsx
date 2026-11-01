@@ -4,8 +4,11 @@ import { AppShell } from '../components/AppShell'
 import { StepIndicator } from '../components/StepIndicator'
 import { Modal } from '../components/Modal'
 import { ImageZoom } from '../components/ImageZoom'
+import { OnlineSearchPanel } from '../components/OnlineSearchPanel'
+import { ForensicsPanel } from '../components/ForensicsPanel'
 import { useAppState } from '../state/AppState'
 import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
+import '../styles/forensicsTest.css'
 
 /* Fixed advisory text required on every result (SDS §4.1.2.7, BR-12 / FR-11). */
 const DISCLAIMER =
@@ -69,9 +72,12 @@ export const Results: React.FC = () => {
         </div>
 
         <div className="result-body">
-          <div className="result-text">
+          <div className="result-text result-text--compact">
             <h2 className="result-text-title">What we found</h2>
             <p>{currentResult.summary}</p>
+            {currentResult.detectionError ? (
+              <p className="result-text-note">{currentResult.detectionError}</p>
+            ) : null}
           </div>
 
           <div className="result-side">
@@ -86,6 +92,8 @@ export const Results: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <OnlineSearchPanel data={currentResult.onlineSearch} />
 
         <Alert tone="success" icon={<TrashCheckIcon className="ui-alert__icon" />} className="privacy-note">
           {privacyText}
@@ -108,6 +116,13 @@ export const Results: React.FC = () => {
           <StepIndicator step={3} />
         </div>
       </Card>
+
+      {currentResult.forensics && (
+        <details className="ui-card ui-card--pad-lg forensics-disclosure">
+          <summary className="forensics-disclosure__summary">Forensics</summary>
+          <ForensicsPanel forensics={currentResult.forensics} />
+        </details>
+      )}
 
       {saved && (
         <Modal
