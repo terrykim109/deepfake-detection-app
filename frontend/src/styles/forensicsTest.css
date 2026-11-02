@@ -106,3 +106,37 @@
   border-radius: 8px;
   font-size: 0.8rem;
 }
+
+/* ───────────── Forensics disclosure (Results page) ───────────── */
+.forensics-disclosure {
+  margin-top: 1.5rem;
+}
+
+.forensics-disclosure__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.forensics-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.forensics-disclosure__summary::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.forensics-disclosure[open] > .forensics-disclosure__summary::before {
+  transform: rotate(45deg);
+}
