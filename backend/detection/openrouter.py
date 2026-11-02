@@ -16,10 +16,11 @@ from config import OPENROUTER_API_KEY, OPENROUTER_MODELS
 from detection.base import DetectionError, DetectionResult
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-_TIMEOUT_SECONDS = 45.0 
-_MAX_TOKENS = 600 
-_TEMPERATURE = 0.2 # Keep responses relatively consistent
-_MAX_FINDINGS = 3 # Maximum suspicious regions retained per result
+_TIMEOUT_SECONDS = 45.0
+# Room for verdict/summary plus up to 3 region findings (truncated JSON drops findings).
+_MAX_TOKENS = 1600
+_TEMPERATURE = 0.2  # Keep responses relatively consistent
+_MAX_FINDINGS = 3  # Maximum suspicious regions retained per result
 _DISAGREEMENT_THRESHOLD = 30 
 
 _PROMPT = """You are an image forensics assistant helping detect AI-generated or digitally manipulated photos.
@@ -104,13 +105,88 @@ def _extract_json(text: str) -> dict:
 
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as original_error:
         match = re.search(r"\{.*\}", text, re.DOTALL)
 
-        if not match:
-            raise
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
 
-        return json.loads(match.group(0))
+        # Some free vision models stop mid-JSON at their output-token limit.
+        # Recover required fields and any complete finding objects that made it through.
+        verdict_match = re.search(
+            r'"verdict"\s*:\s*"(?P<value>[^"]+)"',
+            text,
+            re.IGNORECASE,
+        )
+        confidence_match = re.search(
+            r'"confidence"\s*:\s*(?P<value>-?\d+(?:\.\d+)?)',
+            text,
+            re.IGNORECASE,
+        )
+        summary_match = re.search(
+            r'"summary"\s*:\s*"(?P<value>(?:\\.|[^"\\])*)',
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+
+        if not (verdict_match and confidence_match and summary_match):
+            raise original_error
+
+        try:
+            summary = json.loads(f'"{summary_match.group("value")}"').strip()
+        except json.JSONDecodeError:
+            summary = summary_match.group("value").strip()
+
+        return {
+            "verdict": verdict_match.group("value"),
+            "confidence": confidence_match.group("value"),
+            "summary": summary,
+            "findings": _recover_findings_objects(text),
+        }
+
+
+def _recover_findings_objects(text: str) -> list[dict[str, Any]]:
+    """Pull complete finding objects out of truncated model JSON."""
+    recovered: list[dict[str, Any]] = []
+    pattern = re.compile(
+        r'\{\s*"label"\s*:\s*"(?P<label>(?:\\.|[^"\\])*)"\s*,\s*'
+        r'"explanation"\s*:\s*"(?P<explanation>(?:\\.|[^"\\])*)"\s*,\s*'
+        r'"x"\s*:\s*(?P<x>-?\d+(?:\.\d+)?)\s*,\s*'
+        r'"y"\s*:\s*(?P<y>-?\d+(?:\.\d+)?)\s*,\s*'
+        r'"w"\s*:\s*(?P<w>-?\d+(?:\.\d+)?)\s*,\s*'
+        r'"h"\s*:\s*(?P<h>-?\d+(?:\.\d+)?)\s*\}',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in pattern.finditer(text):
+        if len(recovered) >= _MAX_FINDINGS:
+            break
+        try:
+            label = json.loads(f'"{match.group("label")}"').strip()
+            explanation = json.loads(f'"{match.group("explanation")}"').strip()
+        except json.JSONDecodeError:
+            label = match.group("label").strip()
+            explanation = match.group("explanation").strip()
+        recovered.append(
+            {
+                "label": label,
+                "explanation": explanation,
+                "x": match.group("x"),
+                "y": match.group("y"),
+                "w": match.group("w"),
+                "h": match.group("h"),
+            }
+        )
+    return recovered
+
+
+def _norm_coord(value: float) -> float:
+    """Accept 0–1 fractions or 0–100 percentages from vision models."""
+    if value > 1.0:
+        value = value / 100.0
+    return _clamp01(value)
 
 
 def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
@@ -136,10 +212,10 @@ def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
             continue
 
         try:
-            x = _clamp01(float(item.get("x")))
-            y = _clamp01(float(item.get("y")))
-            w = _clamp01(float(item.get("w")))
-            h = _clamp01(float(item.get("h")))
+            x = _norm_coord(float(item.get("x")))
+            y = _norm_coord(float(item.get("y")))
+            w = _norm_coord(float(item.get("w")))
+            h = _norm_coord(float(item.get("h")))
         except (TypeError, ValueError):
             continue
 
@@ -147,7 +223,7 @@ def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
         w = min(w, 1.0 - x)
         h = min(h, 1.0 - y)
 
-        if w <= 0 or h <= 0:
+        if w <= 0.01 or h <= 0.01:
             continue
 
         findings.append(
@@ -175,11 +251,13 @@ def _parse_model_payload(model: str, payload: dict) -> _ModelScore:
     content = message.get("content")
 
     if isinstance(content, list):
-        parts = [
-            p.get("text", "")
-            for p in content
-            if isinstance(p, dict)
-        ]
+        parts = []
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            text = part.get("text")
+            if isinstance(text, str):
+                parts.append(text)
         content = "\n".join(parts)
 
     if not isinstance(content, str):
@@ -383,13 +461,11 @@ def _combine(scores: list[_ModelScore]) -> DetectionResult:
                 f"score {confidence}/100.)"
             )
 
-    # Removed the old artificial minimum of 55 for "real" results.
-    # The returned score now matches the ensemble's median score.
-    findings = (
-        _pick_findings(scores, confidence)
-        if verdict != "real"
-        else []
-    )
+    # Keep region cues whenever any model supplied them, unless every model
+    # agreed the image looks real (ensemble verdict real + no warn/fake votes).
+    findings = _pick_findings(scores, confidence)
+    if verdict == "real" and not any(s.verdict in {"warn", "fake"} for s in scores):
+        findings = []
 
     return DetectionResult(
         verdict=verdict,
