@@ -22,7 +22,7 @@ ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # Analysis quotas
 MAX_ACTIVE_ANALYSES_PER_USER = 1
-MAX_ANALYSES_PER_24H = 200 # Just for testing
+MAX_ANALYSES_PER_24H = 20
 
 FORMAT_HELP = "Please choose a JPG, JPEG, PNG, or WEBP image under 10 MB."
 
