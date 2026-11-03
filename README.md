@@ -94,6 +94,27 @@ python main.py
 
 Backend: `http://localhost:8000`
 
+### Designating application administrators
+
+Application administrators are existing Firebase Authentication accounts with
+the verified custom claim `admin: true`. This is separate from Firebase
+project administrator access. The claim is checked by the FastAPI backend,
+not just by the frontend.
+
+After configuring trusted Firebase Admin SDK credentials, run the assignment
+script from the `backend` directory. It accepts existing account emails only
+and allows at most five application administrators:
+
+```bash
+python -m scripts.set_admin_claim --email admin@example.com
+# Repeat --email for additional existing accounts.
+```
+
+The script preserves other custom claims, refuses unknown accounts, and is not
+available through an HTTP endpoint. Each designated user must refresh their
+Firebase ID token (normally by signing out and back in) before the new claim
+is included in backend requests.
+
 ### Frontend
 
 ```bash
@@ -110,5 +131,4 @@ The Vite development server proxies `/api` requests to the backend.
 
 - The application is a screening tool, not a forensic or identity-verification authority.
 - Detection results should not be treated as definitive proof.
-
 
