@@ -39,6 +39,17 @@ export const ImageZoom: React.FC<ImageZoomProps> = ({ src, alt, findings = [] })
 
   const active = findings.find((f) => f.id === activeId) ?? null
 
+  // Auto-select the first region so highlights are obvious without a click.
+  useEffect(() => {
+    if (findings.length === 0) {
+      setActiveId(null)
+      return
+    }
+    setActiveId((prev) =>
+      prev && findings.some((f) => f.id === prev) ? prev : findings[0].id,
+    )
+  }, [findings])
+
   const measureContent = useCallback(() => {
     const viewport = viewportRef.current
     const img = imgRef.current
@@ -83,6 +94,38 @@ export const ImageZoom: React.FC<ImageZoomProps> = ({ src, alt, findings = [] })
     setScale(MIN_SCALE)
     setOffset({ x: 0, y: 0 })
   }
+
+  /** Zoom so the finding fills most of the viewport and is centered. */
+  const zoomToFinding = useCallback(
+    (finding: Finding) => {
+      const viewport = viewportRef.current
+      if (!viewport || !contentBox) {
+        setActiveId(finding.id)
+        return
+      }
+
+      const vw = viewport.clientWidth
+      const vh = viewport.clientHeight
+      const regionW = Math.max(finding.w * contentBox.width, 1)
+      const regionH = Math.max(finding.h * contentBox.height, 1)
+      // Leave ~30% margin around the box so context stays visible.
+      const fit = Math.min(vw / regionW, vh / regionH) * 0.7
+      const nextScale = clampScale(Math.max(2, fit))
+
+      const centerX = contentBox.left + (finding.x + finding.w / 2) * contentBox.width
+      const centerY = contentBox.top + (finding.y + finding.h / 2) * contentBox.height
+      // Inverse of the pan math used for viewport-center hit testing.
+      const nextOffset = {
+        x: (vw / 2 - centerX) * nextScale,
+        y: (vh / 2 - centerY) * nextScale,
+      }
+
+      setActiveId(finding.id)
+      setScale(nextScale)
+      setOffset(nextOffset)
+    },
+    [contentBox],
+  )
 
   const onWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
@@ -184,11 +227,12 @@ export const ImageZoom: React.FC<ImageZoomProps> = ({ src, alt, findings = [] })
                       width: `${finding.w * 100}%`,
                       height: `${finding.h * 100}%`,
                     }}
-                    aria-label={`Finding: ${finding.label}`}
+                    aria-label={`Zoom to finding: ${finding.label}`}
                     aria-pressed={selected}
+                    title="Click to zoom into this area"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setActiveId(finding.id)
+                      zoomToFinding(finding)
                     }}
                   >
                     <span className="image-zoom__marker-badge">{index + 1}</span>
@@ -220,12 +264,12 @@ export const ImageZoom: React.FC<ImageZoomProps> = ({ src, alt, findings = [] })
               <p className="image-zoom__explain-label">{active.label}</p>
               <p className="image-zoom__explain-body">{active.explanation}</p>
               <p className="image-zoom__explain-note">
-                Model-suggested cue — not definitive proof. Zoom into marked areas to inspect.
+                Model-suggested cue — not definitive proof. Click a marked area to zoom into it.
               </p>
             </>
           ) : (
             <p className="image-zoom__explain-body">
-              Tap a numbered region or zoom into a marked area to see why it may look manipulated.
+              Click a numbered region to zoom in and see why it may look manipulated.
             </p>
           )}
         </div>
