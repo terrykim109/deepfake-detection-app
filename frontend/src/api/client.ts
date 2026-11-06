@@ -219,6 +219,43 @@ export interface AnalysisRunResponse {
   provider?: string
 }
 
+export type AdminInterval = 'daily' | 'weekly' | 'monthly'
+
+export interface AdminUsageBucket {
+  period: string
+  totalAnalyses: number
+  successfulAnalyses: number
+  failedAnalyses: number
+}
+
+export interface AdminUsageResponse {
+  interval: AdminInterval
+  totals: Omit<AdminUsageBucket, 'period'>
+  buckets: AdminUsageBucket[]
+}
+
+export interface AdminUser {
+  userId: string
+  email: string
+  displayName: string | null
+  createdAt: string | null
+  isVerified: boolean
+  role: 'admin' | 'user'
+}
+
+export interface AdminUsersResponse {
+  totalUsers: number
+  verifiedUsers: number
+  unverifiedUsers: number
+  users: AdminUser[]
+}
+
+export const adminApi = {
+  usage: (interval: AdminInterval) =>
+    get<AdminUsageResponse>(`/api/admin/usage?interval=${interval}`),
+  users: () => get<AdminUsersResponse>('/api/admin/users'),
+}
+
 async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<ApiResponse<T>> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
