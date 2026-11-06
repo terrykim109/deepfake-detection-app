@@ -116,6 +116,20 @@ def get_temp_meta(image_id: str) -> dict | None:
         return None
 
 
+def update_temp_meta(image_id: str, **updates: object) -> bool:
+    """Update non-sensitive metadata for an active temporary image."""
+    with _lock:
+        meta = get_temp_meta(image_id)
+        if not meta or meta.get("deleted_at"):
+            return False
+        meta.update(updates)
+        try:
+            _meta_path(image_id).write_text(json.dumps(meta), encoding="utf-8")
+        except OSError:
+            return False
+        return True
+
+
 def read_temp_bytes(image_id: str) -> bytes | None:
     meta = get_temp_meta(image_id)
     if not meta or meta.get("deleted_at"):

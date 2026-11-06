@@ -10,13 +10,19 @@ from analysis_limits import (
     mark_analysis_started,
 )
 from auth_dependency import get_current_user
+from analysis_tracking import complete_analysis_request, create_analysis_request
 from config import PUBLIC_BASE_URL
 from detection import DetectionError, get_detector
 from forensics import run_forensics
 from helpers import generate_id, log_event, now_iso
 from lens_hosting import publish_for_scrappa
 from reverse_search import reverse_image_search
-from temp_images import delete_temp_image, get_temp_meta, store_temp_image
+from temp_images import (
+    delete_temp_image,
+    get_temp_meta,
+    store_temp_image,
+    update_temp_meta,
+)
 from upload_validation import validate_image_upload
 
 router = APIRouter(tags=["analysis"])
@@ -110,6 +116,15 @@ async def run_analysis(
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
     try:
+        request_id = create_analysis_request(uid)
+    except Exception as exc:
+        mark_analysis_finished(uid)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Analysis tracking is temporarily unavailable. Please try again.",
+        ) from exc
+
+    try:
         stored = store_temp_image(
             user_id=uid,
             filename=filename,
@@ -118,8 +133,10 @@ async def run_analysis(
         )
         image_id = stored["image_id"]
         access_token = stored["access_token"]
+        update_temp_meta(image_id, request_id=request_id)
     except Exception as exc:
         mark_analysis_finished(uid)
+        complete_analysis_request(request_id, status="failure", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
@@ -208,6 +225,11 @@ async def run_analysis(
     forensics_ok = bool(forensics_out)
 
     if not detection_ok and not search_ok and not forensics_ok:
+        complete_analysis_request(
+            request_id,
+            status="failure",
+            error=detection_out.get("error"),
+        )
         try:
             log_event(
                 "analysis_failed",
@@ -233,6 +255,11 @@ async def run_analysis(
     detection_error = None
     if detection_ok:
         detection = detection_out["detection"]
+        complete_analysis_request(
+            request_id,
+            status="success",
+            confidence=detection.confidence,
+        )
         result_payload = {
             "id": result_id,
             "verdict": detection.verdict,
@@ -262,6 +289,11 @@ async def run_analysis(
             pass
     else:
         detection_error = detection_out.get("error") or "Deepfake detection could not be completed."
+        complete_analysis_request(
+            request_id,
+            status="failure",
+            error=detection_error,
+        )
         try:
             log_event(
                 "analysis_partial",
@@ -327,14 +359,25 @@ async def start_analysis(
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
     try:
+        request_id = create_analysis_request(uid)
+    except Exception as exc:
+        mark_analysis_finished(uid)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Analysis tracking is temporarily unavailable. Please try again.",
+        ) from exc
+
+    try:
         stored = store_temp_image(
             user_id=uid,
             filename=file.filename,
             content_type=file.content_type,
             data=data,
         )
+        update_temp_meta(stored["image_id"], request_id=request_id)
     except Exception as exc:
         mark_analysis_finished(uid)
+        complete_analysis_request(request_id, status="failure", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
@@ -384,6 +427,9 @@ async def finish_analysis(
 
     deletion = delete_temp_image(iid, reason=f"analysis_{result}")
     usage = mark_analysis_finished(uid)
+    request_id = (meta or {}).get("request_id")
+    if request_id:
+        complete_analysis_request(request_id, status=result)
 
     privacy_message = (
         "Your original image has been deleted from our servers. "

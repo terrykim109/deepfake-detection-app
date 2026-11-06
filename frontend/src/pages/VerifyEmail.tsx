@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppState } from "../state/AppState";
 import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { Alert, Button, MailIcon } from "../components/ui";
 
 /* Seconds before another verification email can be requested, so users
@@ -29,13 +30,14 @@ export const VerifyEmail: React.FC = () => {
   useEffect(() => {
     if (email) return;
     let cancelled = false;
-    auth.authStateReady().then(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (cancelled) return;
-      setEmail(auth.currentUser?.email || "");
+      setEmail(user?.email || "");
       setReady(true);
     });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [email]);
 
