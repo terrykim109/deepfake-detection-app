@@ -7,7 +7,7 @@ import type { ForensicsResult } from "../api/client";
 export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
   forensics,
 }) => {
-  const { metadata, ela, noise, c2pa } = forensics;
+  const { metadata, ela, noise, edges, c2pa } = forensics;
 
   return (
     <section className="forensics-results" aria-label="Forensics result">
@@ -105,6 +105,31 @@ export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
         ) : (
           <Alert tone="warning">
             Noise analysis failed: {noise.error ?? "unknown error"}
+          </Alert>
+        )}
+      </Card>
+
+      <Card padding="lg" className="forensics-section">
+        <h3>Edge / gradient detection</h3>
+        {edges.available ? (
+          <div className="forensics-image-row">
+            <img
+              className="forensics-result-image"
+              src={edges.image_base64}
+              alt="Edge/gradient density heatmap"
+            />
+            <dl className="forensics-kv">
+              <dt>Mean edge density</dt>
+              <dd>{edges.mean_edge_density?.toFixed(2)}</dd>
+              <dt>Std edge density</dt>
+              <dd>{edges.std_edge_density?.toFixed(2)}</dd>
+              <dt>Max edge density</dt>
+              <dd>{edges.max_edge_density?.toFixed(2)}</dd>
+            </dl>
+          </div>
+        ) : (
+          <Alert tone="warning">
+            Edge detection failed: {edges.error ?? "unknown error"}
           </Alert>
         )}
       </Card>

@@ -334,6 +334,16 @@ export interface ForensicsNoiseResult {
   error?: string
 }
 
+export interface ForensicsEdgesResult {
+  available: boolean
+  image_base64?: string
+  mean_edge_density?: number
+  std_edge_density?: number
+  max_edge_density?: number
+  block_size?: number
+  error?: string
+}
+
 export interface ForensicsC2paResult {
   found: boolean
   detail: string
@@ -344,6 +354,7 @@ export interface ForensicsResult {
   metadata: ForensicsMetadataResult
   ela: ForensicsElaResult
   noise: ForensicsNoiseResult
+  edges: ForensicsEdgesResult
   c2pa: ForensicsC2paResult
 }
 

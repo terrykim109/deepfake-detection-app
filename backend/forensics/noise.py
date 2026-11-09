@@ -10,6 +10,32 @@ BLOCK_SIZE = 16
 OUTLIER_THRESHOLD_STD = 2.0
 
 
+def _block_grid(high_pass: np.ndarray) -> np.ndarray:
+    """Per-BLOCK_SIZE-block variance of a high-pass (Laplacian) map."""
+    height, width = high_pass.shape
+    rows = max(height // BLOCK_SIZE, 1)
+    cols = max(width // BLOCK_SIZE, 1)
+
+    block_variance = np.zeros((rows, cols), dtype=np.float64)
+    for r in range(rows):
+        for c in range(cols):
+            y0, y1 = r * BLOCK_SIZE, min((r + 1) * BLOCK_SIZE, height)
+            x0, x1 = c * BLOCK_SIZE, min((c + 1) * BLOCK_SIZE, width)
+            block_variance[r, c] = high_pass[y0:y1, x0:x1].var()
+    return block_variance
+
+
+def noise_block_grid(image_bytes: bytes) -> np.ndarray:
+    """Raw per-block noise-variance grid, for the Learn-page precompute script."""
+    buffer = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("Could not decode image bytes")
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    high_pass = cv2.Laplacian(gray, cv2.CV_64F)
+    return _block_grid(high_pass)
+
+
 def analyze_noise(image_bytes: bytes) -> dict[str, Any]:
     try:
         buffer = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -21,15 +47,7 @@ def analyze_noise(image_bytes: bytes) -> dict[str, Any]:
         high_pass = cv2.Laplacian(gray, cv2.CV_64F)
 
         height, width = high_pass.shape
-        rows = max(height // BLOCK_SIZE, 1)
-        cols = max(width // BLOCK_SIZE, 1)
-
-        block_variance = np.zeros((rows, cols), dtype=np.float64)
-        for r in range(rows):
-            for c in range(cols):
-                y0, y1 = r * BLOCK_SIZE, min((r + 1) * BLOCK_SIZE, height)
-                x0, x1 = c * BLOCK_SIZE, min((c + 1) * BLOCK_SIZE, width)
-                block_variance[r, c] = high_pass[y0:y1, x0:x1].var()
+        block_variance = _block_grid(high_pass)
 
         mean_variance = float(block_variance.mean())
         std_variance = float(block_variance.std())
