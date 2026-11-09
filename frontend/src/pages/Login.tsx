@@ -96,6 +96,23 @@ export const Login: React.FC = () => {
             disabled={loading}
           />
 
+          <Link
+            to="/forgot-password"
+            className="auth-forgot"
+            onClick={(e) => {
+              clearError();
+              // Carry over whatever was typed so the reset form starts filled in
+              const form = e.currentTarget.closest("form");
+              const typed = (form?.elements.namedItem("email") as HTMLInputElement | null)?.value.trim();
+              if (typed) {
+                e.preventDefault();
+                navigate("/forgot-password", { state: { email: typed } });
+              }
+            }}
+          >
+            Forgot password?
+          </Link>
+
           {displayError && <Alert tone="error">{displayError}</Alert>}
 
           <Button type="submit" size="lg" fullWidth loading={loading} className="auth-submit">
