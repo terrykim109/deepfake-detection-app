@@ -43,6 +43,21 @@ function clearStored() {
   clearLastActivity();
 }
 
+/** Read the application admin claim from a Firebase ID token (JWT). */
+export function tokenHasAdminClaim(token: string | null | undefined): boolean {
+  if (!token) return false;
+  try {
+    const segment = token.split(".")[1];
+    if (!segment) return false;
+    const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const payload = JSON.parse(atob(padded)) as { admin?: unknown };
+    return payload.admin === true;
+  } catch {
+    return false;
+  }
+}
+
 /* Map a Firebase Auth error code to a user-facing message */
 function firebaseAuthErrorMessage(err: unknown): string {
   const code =
@@ -81,6 +96,8 @@ export interface AuthState {
   user: UserResponse | null;
   token: string | null;
   profile: Profile;
+  /** True when the Firebase ID token carries `admin: true`. */
+  isAdmin: boolean;
   loading: boolean;
   saving: boolean;
   error: string;
@@ -425,6 +442,7 @@ export function useAuth(): AuthState & AuthActions {
     user,
     token,
     profile,
+    isAdmin: tokenHasAdminClaim(token),
     loading,
     saving,
     error,

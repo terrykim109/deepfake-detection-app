@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAppState } from '../state/AppState'
 import { IconButton } from './ui'
 import { SettingsMenu } from './SettingsMenu'
 
@@ -15,9 +16,11 @@ const HISTORY_PATHS = ['/history', '/result/']
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { isAdmin } = useAppState()
 
   const analyzeActive = ANALYZE_PATHS.some((p) => pathname.startsWith(p))
   const historyActive = HISTORY_PATHS.some((p) => pathname.startsWith(p))
+  const dashboardActive = pathname.startsWith('/dashboard')
 
   return (
     <div className="ui-container">
@@ -52,6 +55,16 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         >
           History
         </button>
+        {isAdmin ? (
+          <button
+            type="button"
+            className="nav-tab"
+            aria-current={dashboardActive ? 'page' : undefined}
+            onClick={() => navigate('/dashboard')}
+          >
+            Dashboard
+          </button>
+        ) : null}
       </nav>
 
       <main>{children}</main>

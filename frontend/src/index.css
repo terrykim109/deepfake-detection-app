@@ -624,3 +624,28 @@
   align-items: center;
   justify-content: center;
 }
+
+/* ───────────── Admin ───────────── */
+.admin-sections {
+  display: grid;
+  gap: var(--space-6);
+}
+.admin-placeholder {
+  min-height: 180px;
+}
+.admin-placeholder__state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--secondary-text);
+}
+.admin-section__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+@media (max-width: 767px) {
+  .admin-sections { gap: var(--space-4); }
+}
