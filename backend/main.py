@@ -8,6 +8,7 @@ from firebase_config import db
 from routers import auth
 from routers import users
 from routers import analysis
+from routers import admin
 from routers import forensics
 from routers import level_summary
 from routers import public_images
@@ -35,6 +36,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 app.include_router(forensics.router, prefix="/api")
 app.include_router(level_summary.router, prefix="/api")
 # Token-gated temp image bytes for Scrappa (no Firebase auth — short-lived only)

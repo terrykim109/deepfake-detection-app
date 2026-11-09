@@ -59,3 +59,14 @@ async def get_current_user(
         ) from exc
 
     return {"uid": uid, "claims": decoded}
+
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Require the verified Firebase token to carry the application admin claim."""
+    claims = user.get("claims") or {}
+    if claims.get("admin") is not True:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Application administrator privileges required",
+        )
+    return user

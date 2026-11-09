@@ -256,13 +256,13 @@
   padding: 0;
   border: 2px solid color-mix(in srgb, var(--accent, #c45c26) 85%, white);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--accent, #c45c26) 18%, transparent);
+  background: transparent;
   pointer-events: auto;
   cursor: pointer;
 }
 .image-zoom__marker--active {
   border-color: var(--accent, #c45c26);
-  background: color-mix(in srgb, var(--accent, #c45c26) 28%, transparent);
+  background: transparent;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #c45c26) 40%, transparent);
 }
 .image-zoom__marker-badge {
