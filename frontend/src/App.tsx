@@ -14,6 +14,7 @@ import { Results } from './pages/Results'
 import { ResultDetail } from './pages/ResultDetail'
 import { Learn } from './pages/Learn'
 import { StyleGuide } from './pages/StyleGuide'
+import { Admin } from './pages/Admin'
 import { FullPageSpinner } from './components/ui'
 
 /* ─── Auth Guards ─── */
@@ -21,6 +22,13 @@ const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) =
   const { user, loading } = useAppState()
   if (loading) return <FullPageSpinner />
   return user ? children : <Navigate to="/login" replace />
+}
+
+const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+  const { user, loading, isAdmin } = useAppState()
+  if (loading) return <FullPageSpinner />
+  if (!user) return <Navigate to="/login" replace />
+  return isAdmin ? children : <Navigate to="/profile" replace />
 }
 
 const RedirectIfAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -49,6 +57,7 @@ const AppRoutes: React.FC = () => (
     <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
     <Route path="/result/:id" element={<RequireAuth><ResultDetail /></RequireAuth>} />
     <Route path="/learn" element={<RequireAuth><Learn /></RequireAuth>} />
+    <Route path="/dashboard" element={<RequireAdmin><Admin /></RequireAdmin>} />
     {/* Design-system reference for the team — public, not linked in the nav */}
     <Route path="/styleguide" element={<StyleGuide />} />
     <Route path="/" element={<LandingOrApp />} />
