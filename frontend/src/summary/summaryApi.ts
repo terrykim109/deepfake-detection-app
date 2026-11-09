@@ -44,10 +44,12 @@ const forensicsSchema = z.object({
 const evidenceSchema = z.object({
   level: summaryLevelSchema,
   detector: z.object({
+    status: z.enum(['available', 'failed']),
     verdict: z.enum(['real', 'warn', 'fake']),
     confidence: z.number().int().min(0).max(100),
     summary: z.string().min(1).max(1000),
     findings: z.array(findingSchema).max(3),
+    error: z.string().max(500).nullable(),
   }),
   forensics: forensicsSchema.nullable(),
 })
@@ -140,10 +142,12 @@ export async function streamLevelSummary(
   const parsedEvidence = evidenceSchema.safeParse({
     level,
     detector: {
+      status: result.detectionError ? 'failed' : 'available',
       verdict: result.verdict,
       confidence: Math.round(score),
       summary: cleanText(result.summary, 1000) || '(no explanation supplied)',
       findings,
+      error: cleanText(result.detectionError, 500) ?? null,
     },
     forensics: compactForensics(forensics),
   })

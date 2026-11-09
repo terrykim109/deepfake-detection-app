@@ -18,6 +18,13 @@ if "firebase_config" not in sys.modules:
 from auth_dependency import get_current_user
 from routers import level_summary
 
+REAL_SUMMARY_VALIDATOR = level_summary._summary_violations
+
+
+@pytest.fixture(autouse=True)
+def allow_short_fake_summaries(monkeypatch):
+    monkeypatch.setattr(level_summary, "_summary_violations", lambda *args, **kwargs: [])
+
 
 class FakeResponse:
     status_code = 200
@@ -78,7 +85,10 @@ def app_client():
 def request_body(level="beginner"):
     return {
         "level": level,
-        "detector": {"verdict": "warn", "confidence": 45, "summary": "Mixed signals.", "findings": []},
+        "detector": {
+            "status": "available", "verdict": "warn", "confidence": 45,
+            "summary": "Mixed signals.", "findings": [], "error": None,
+        },
         "forensics": None,
     }
 
@@ -94,7 +104,7 @@ def test_streams_three_summary_levels(monkeypatch, level):
     assert response.status_code == 200
     frames = [frame for frame in response.text.split("\n\n") if frame]
     assert [frame.splitlines()[0] for frame in frames] == [
-        "event: context", "event: delta", "event: delta", "event: complete",
+        "event: context", "event: delta", "event: complete",
     ]
     complete = json.loads(frames[-1].split("data: ", 1)[1])
     assert complete == {"summary": "A cautious summary.", "level": level, "truncated": False}
@@ -119,12 +129,68 @@ def test_provider_matches_detector_factory(monkeypatch, provider, simulated):
         assert evidence["detector"] == "No detector result available."
     else:
         assert evidence["detector"] == {
-            "verdict": "warn", "manipulation_score": 45,
+            "status": "available", "verdict": "warn", "manipulation_score": 45,
             "detector_note": "Mixed signals.", "findings": [],
         }
         assert "confidence" not in evidence["detector"]
         assert "summary" not in evidence["detector"]
         assert "higher means more signs of manipulation" in FakeClient.last_payload["messages"][0]["content"]
+
+
+def test_failed_detector_omits_placeholder_verdict_and_score(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-only")
+    monkeypatch.setattr(level_summary, "DETECTION_PROVIDER", "openrouter")
+    monkeypatch.setattr(level_summary, "_check_summary_limit", lambda uid: "reservation-1")
+    monkeypatch.setattr(level_summary.httpx, "AsyncClient", lambda timeout: FakeClient())
+    body = request_body()
+    body["detector"].update({"status": "failed", "confidence": 0, "error": "Detection unavailable"})
+
+    response = app_client().post("/api/summary/stream", json=body)
+
+    assert response.status_code == 200
+    evidence = json.loads(FakeClient.last_payload["messages"][1]["content"].split("\n", 1)[1])
+    assert evidence["detector"] == {
+        "status": "failed",
+        "message": "The main detection did not complete. Do not use a verdict or score.",
+    }
+
+
+@pytest.mark.parametrize("level,text", [
+    ("beginner", "This metadata text " + "word " * 100),
+    ("intermediate", "The credential was not embedded. " + "word " * 170),
+    ("technical", "No further EXIF details are supplied. " + "word " * 260),
+])
+def test_summary_validator_rejects_banned_language(level, text):
+    assert REAL_SUMMARY_VALIDATOR(text, level)
+
+
+def test_summary_validator_rejects_unformatted_thousands():
+    text = "word " * 95 + "There were 1184 patches."
+    assert "contains an unformatted number of 1,000 or more" in REAL_SUMMARY_VALIDATOR(text, "beginner")
+
+
+def test_validated_summary_is_split_without_changing_text():
+    text = "One two three four five six seven eight nine ten."
+    chunks = level_summary._display_chunks(text, words_per_chunk=3)
+    assert len(chunks) == 4
+    assert "".join(chunks) == text
+
+
+def test_failed_detector_summary_requires_failure_disclosure():
+    text = ("This summary relies on the available file checks. " + "word " * 95).strip()
+    violations = REAL_SUMMARY_VALIDATOR(text + "\n\nSecond paragraph.", "beginner", detector_failed=True)
+    assert any("main detection did not complete" in violation for violation in violations)
+
+
+def test_style_violations_are_retry_only_but_safety_violations_remain_hard():
+    violations = [
+        "word count is 220; required range is 250-400",
+        "paragraph count is 1; required range is 2-4",
+        "contains prohibited phrase: score of 0",
+    ]
+    assert level_summary._hard_summary_violations(violations) == [
+        "contains prohibited phrase: score of 0",
+    ]
 
 
 @pytest.mark.parametrize("model,has_effort", [("openai/gpt-oss-120b", True), ("other/model", False)])
@@ -210,16 +276,15 @@ def test_summary_limit_returns_429(monkeypatch):
     assert app_client().post("/api/summary/stream", json=request_body()).status_code == 429
 
 
-def test_demo_limit_override_is_bounded_and_keeps_real_provider_limit(monkeypatch):
-    monkeypatch.setattr(level_summary, "DETECTION_PROVIDER", "stub")
-    monkeypatch.delenv("SUMMARY_DEMO_LIMIT", raising=False)
-    assert level_summary._summary_daily_limit() == 30
-    monkeypatch.setenv("SUMMARY_DEMO_LIMIT", "45")
-    assert level_summary._summary_daily_limit() == 45
-    monkeypatch.setenv("SUMMARY_DEMO_LIMIT", "500")
-    assert level_summary._summary_daily_limit() == 60
-    monkeypatch.setattr(level_summary, "DETECTION_PROVIDER", "openrouter")
-    assert level_summary._summary_daily_limit() == 30
+def test_summary_limit_override_is_bounded_for_every_provider(monkeypatch):
+    monkeypatch.delenv("SUMMARY_DAILY_LIMIT", raising=False)
+    assert level_summary._summary_daily_limit() == 1000
+    monkeypatch.setenv("SUMMARY_DAILY_LIMIT", "2500")
+    assert level_summary._summary_daily_limit() == 2500
+    monkeypatch.setenv("SUMMARY_DAILY_LIMIT", "9000")
+    assert level_summary._summary_daily_limit() == 5000
+    monkeypatch.setenv("SUMMARY_DAILY_LIMIT", "invalid")
+    assert level_summary._summary_daily_limit() == 1000
 
 
 def test_provider_bad_request_is_logged_but_not_shown(monkeypatch, caplog):
@@ -248,7 +313,8 @@ def test_provider_error_inside_stream_is_not_completed(monkeypatch):
 
     response = app_client().post("/api/summary/stream", json=request_body())
 
-    assert "event: delta" in response.text
+    # Buffered validation prevents partial, unvalidated text from reaching the UI.
+    assert "event: delta" not in response.text
     assert "event: error" in response.text
     assert "event: complete" not in response.text
     assert "provider failure" not in response.text
