@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import sys
 import threading
 import types
@@ -129,8 +130,8 @@ def test_provider_matches_detector_factory(monkeypatch, provider, simulated):
         assert evidence["detector"] == "No detector result available."
     else:
         assert evidence["detector"] == {
-            "status": "available", "verdict": "warn", "manipulation_score": 45,
-            "detector_note": "Mixed signals.", "findings": [],
+            "status": "available", "detector_label": "Possible manipulation detected",
+            "detector_score": 45, "detector_explanation": "Mixed signals.", "findings": [],
         }
         assert "confidence" not in evidence["detector"]
         assert "summary" not in evidence["detector"]
@@ -153,6 +154,65 @@ def test_failed_detector_omits_placeholder_verdict_and_score(monkeypatch):
         "status": "failed",
         "message": "The main detection did not complete. Do not use a verdict or score.",
     }
+
+
+@pytest.mark.parametrize("verdict,label", [
+    ("real", "No manipulation detected"),
+    ("warn", "Possible manipulation detected"),
+    ("fake", "Likely manipulated"),
+])
+def test_detector_evidence_uses_ui_badge_labels(verdict, label):
+    detector = level_summary.DetectorEvidence(
+        status="available", verdict=verdict, confidence=45,
+        summary="Detector explanation.", findings=[], error=None,
+    )
+    evidence = level_summary._detector_prompt_evidence(detector)
+    assert evidence["detector_label"] == label
+    assert "verdict" not in evidence
+
+
+def test_compression_like_cues_require_caveat():
+    detector = level_summary.DetectorEvidence(
+        status="available", verdict="warn", confidence=55,
+        summary="Blocky texture and blur were observed.", findings=[], error=None,
+    )
+    assert level_summary._has_compression_like_cue(detector) is True
+    violations = REAL_SUMMARY_VALIDATOR(
+        "Possible manipulation detected. The detector score was 55.",
+        "intermediate", detector_available=True, compression_cue=True,
+    )
+    assert any("compression-or-resizing caveat" in violation for violation in violations)
+
+
+def test_ai_generation_cue_does_not_require_compression_caveat():
+    detector = level_summary.DetectorEvidence(
+        status="available", verdict="fake", confidence=85,
+        summary="Synthetic anatomy and inconsistent lighting were observed.", findings=[], error=None,
+    )
+    assert level_summary._has_compression_like_cue(detector) is False
+
+
+def test_camera_and_software_information_validate_without_exif_claims():
+    body = request_body("technical")
+    body["detector"].update({"verdict": "real", "confidence": 12})
+    body["forensics"] = {
+        "metadata": {
+            "available": True, "format": "JPEG", "software": "WhatsApp",
+            "camera_make": "Canon", "camera_model": "EOS R",
+        },
+        "ela": {"available": True},
+        "noise": {"available": True},
+        "c2pa": {"found": False, "detail": "No signature detected"},
+    }
+    level_summary.SummaryRequest.model_validate(body)
+
+
+def test_forensics_null_does_not_require_forensic_comparison_sentence():
+    text = "Possible manipulation detected. The detector score was 45."
+    violations = REAL_SUMMARY_VALIDATOR(
+        text, "intermediate", detector_available=True, forensics_available=False,
+    )
+    assert not any("neither support nor contradict" in violation for violation in violations)
 
 
 @pytest.mark.parametrize("level,text", [
@@ -191,6 +251,76 @@ def test_style_violations_are_retry_only_but_safety_violations_remain_hard():
     assert level_summary._hard_summary_violations(violations) == [
         "contains prohibited phrase: score of 0",
     ]
+
+
+@pytest.mark.parametrize("text", [
+    "The right side is clear.",
+    "The file does not contain camera details.",
+    "The supplied rule was applied.",
+    "The check found 48 of 1,184 patches using 16-pixel blocks.",
+])
+def test_repair_does_not_rewrite_sentence_content(text):
+    assert level_summary._repair_summary(text, "beginner") == text
+
+
+@pytest.mark.parametrize("text", [
+    "The right side is clear.",
+    "The file does not contain camera details.",
+    "The supplied rule was applied.",
+    "The check found 48 of 1,184 patches using 16-pixel blocks.",
+])
+def test_unfixable_content_remains_a_hard_violation(text):
+    repaired = level_summary._repair_summary(text, "beginner")
+    violations = REAL_SUMMARY_VALIDATOR(repaired, "beginner")
+    assert level_summary._hard_summary_violations(violations)
+
+
+def test_repair_keeps_only_safe_formatting_changes():
+    text = "# Summary\n- Count 1184 blocks.\n\nTwo.\n\nThree.\n\nFour.\n\nFive."
+    repaired = level_summary._repair_summary(text, "technical")
+    assert repaired.startswith("Summary\nCount 1,184 blocks.")
+    assert len(re.split(r"\n\s*\n", repaired)) == 4
+    assert repaired.endswith("Four. Five.")
+
+
+def test_repair_may_append_only_required_disclosures():
+    repaired = level_summary._repair_summary(
+        "The available checks are inconclusive.",
+        "intermediate",
+        detector_failed=True,
+        compression_cue=True,
+    )
+    assert repaired.startswith(
+        "The main detection did not complete, so this summary relies on file checks only."
+    )
+    assert repaired.endswith(
+        "that cue alone cannot distinguish editing from compression."
+    )
+
+
+def test_validation_error_after_safe_repair_refunds_quota(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-only")
+    monkeypatch.setattr(level_summary, "DETECTION_PROVIDER", "openrouter")
+    monkeypatch.setattr(level_summary, "_check_summary_limit", lambda uid: "reservation-1")
+    monkeypatch.setattr(level_summary.httpx, "AsyncClient", lambda timeout: FakeClient())
+    monkeypatch.setattr(level_summary, "_summary_violations", REAL_SUMMARY_VALIDATOR)
+    refunded = []
+    monkeypatch.setattr(
+        level_summary,
+        "_refund_summary_limit",
+        lambda uid, reservation: refunded.append((uid, reservation)),
+    )
+
+    async def invalid_summary(client, payload, key):
+        return "The right side is clear.", "stop", None
+
+    monkeypatch.setattr(level_summary, "_collect_summary", invalid_summary)
+
+    response = app_client().post("/api/summary/stream", json=request_body())
+
+    assert "required safety and clarity rules" in response.text
+    assert "event: complete" not in response.text
+    assert refunded == [("test-user", "reservation-1")]
 
 
 @pytest.mark.parametrize("model,has_effort", [("openai/gpt-oss-120b", True), ("other/model", False)])
