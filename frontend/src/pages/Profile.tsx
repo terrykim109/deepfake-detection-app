@@ -11,6 +11,12 @@ import { Alert, Button, CameraIcon, Card, TextField, Toast } from '../components
 const AVATAR_HELP = 'That file can’t be used. Choose a JPG, PNG or WEBP under 10 MB.'
 const TOAST_MS = 3000
 
+/* Off until Cloud Storage is enabled on the Firebase project (it needs the
+   Blaze plan). Every upload fails without it, so hide the controls rather
+   than offer a button that can't work. Flip to true once the bucket and the
+   avatars/{uid} rule exist. */
+const PHOTO_UPLOAD_ENABLED = false
+
 const formatSize = (bytes: number) =>
   bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 
@@ -140,6 +146,7 @@ export const Profile: React.FC = () => {
     .join('')
 
   const shownPhoto = pendingPhoto?.preview || photoURL
+  const avatarFace = shownPhoto ? <img src={shownPhoto} alt="" /> : <span aria-hidden="true">{initials}</span>
   const status = changed ? 'Unsaved changes' : savedNote ? 'Saved just now' : 'No unsaved changes'
 
   return (
@@ -148,43 +155,47 @@ export const Profile: React.FC = () => {
 
       <div className="profile">
         <div className="profile-head">
-          <button
-            type="button"
-            className="profile-avatar"
-            onClick={() => fileInput.current?.click()}
-            disabled={photoBusy}
-            aria-label="Change profile photo"
-          >
-            {shownPhoto ? (
-              <img src={shownPhoto} alt="" />
-            ) : (
-              <span aria-hidden="true">{initials}</span>
-            )}
-            <span className="profile-avatar__badge" aria-hidden="true">
-              <CameraIcon />
-            </span>
-          </button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept={ALLOWED_MIME_TYPES.join(',')}
-            onChange={pickPhoto}
-            hidden
-          />
+          {PHOTO_UPLOAD_ENABLED ? (
+            <>
+              <button
+                type="button"
+                className="profile-avatar"
+                onClick={() => fileInput.current?.click()}
+                disabled={photoBusy}
+                aria-label="Change profile photo"
+              >
+                {avatarFace}
+                <span className="profile-avatar__badge" aria-hidden="true">
+                  <CameraIcon />
+                </span>
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept={ALLOWED_MIME_TYPES.join(',')}
+                onChange={pickPhoto}
+                hidden
+              />
+            </>
+          ) : (
+            <div className="profile-avatar">{avatarFace}</div>
+          )}
 
           <div className="profile-identity">
             <h1 className="profile-name">{fullName || 'Your profile'}</h1>
             {profile.email && <p className="profile-email">{profile.email}</p>}
-            <div className="profile-photo-links">
-              <Button variant="link" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
-                Change photo
-              </Button>
-              {photoURL && !pendingPhoto && (
-                <Button variant="link" className="profile-remove" onClick={deletePhoto} disabled={photoBusy}>
-                  Remove photo
+            {PHOTO_UPLOAD_ENABLED && (
+              <div className="profile-photo-links">
+                <Button variant="link" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
+                  Change photo
                 </Button>
-              )}
-            </div>
+                {photoURL && !pendingPhoto && (
+                  <Button variant="link" className="profile-remove" onClick={deletePhoto} disabled={photoBusy}>
+                    Remove photo
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
