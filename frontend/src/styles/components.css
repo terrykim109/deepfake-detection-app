@@ -108,10 +108,9 @@
   border: 1px solid var(--borders);
   border-radius: var(--radius-md);
   padding: 0 var(--space-4);
-  font-family: var(--font-poppins);
 }
 .ui-field--filled .ui-field__input:focus { border-color: var(--secondary); background: var(--surface); box-shadow: var(--focus-ring); }
-.ui-field--filled .ui-field__label { font-family: var(--font-poppins); font-weight: 500; color: var(--text); }
+.ui-field--filled .ui-field__label { font-weight: 500; color: var(--text); }
 
 .ui-field--has-toggle .ui-field__input { padding-right: 48px; }
 .ui-field__toggle { position: absolute; right: 0; }

@@ -71,7 +71,6 @@
 
   /* Type — 12/14/16/18/20/24/30 product-app scale; only --fs-3xl is fluid */
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-poppins: 'Poppins', var(--font-body);
   /* rem so the text-size setting (font-size on <html>) scales every token */
   --fs-xs: 0.75rem;
   --fs-sm: 0.875rem;
