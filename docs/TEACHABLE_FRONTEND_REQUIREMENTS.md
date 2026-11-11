@@ -27,7 +27,7 @@ is identical to `main`.** Everything in §2–§4 is still to be built, on top o
 |---|---|
 | `frontend/src/api/client.ts` | Extend the finding payload type with `tip?: string` and `confidence?: number`. On the run result payload add `explanation_method?: string`, and `general_cues?: GeneralCuePayload[]` once the backend fallback ships. |
 | `frontend/src/detection/detector.ts` | On `Finding` add `tip?: string` and `confidence?: number` (0–100). Add `GeneralCue { id, label, explanation, tip?, appliesBecause? }`. On `Detection` add `explanationMethod?: string` and `generalCues?: GeneralCue[]`. |
-| `frontend/src/detection/httpDetector.ts` | Map `explanation_method → explanationMethod` and `general_cues → generalCues` (`applies_because → appliesBecause`, default `[]`). Do this for the `partial` path too, because the fallback can return cues even when detection failed. |
+| `frontend/src/detection/httpDetector.ts` | Map `explanation_method → explanationMethod` and `general_cues → generalCues` (`applies_because → appliesBecause`, default `[]`). Do this for the `partial` path too, because the fallback can return cues even when detection failed. On that path the backend's `result` is `null`, so the cues may arrive at the top level of the response instead. Confirm the location with the backend implementation (handoff §7.2, "Wiring"). |
 | `frontend/src/state/AppState.tsx` | Copy `explanationMethod` and `generalCues` onto `currentResult`. Keep them out of History (`toHistorySafe()`), the same as `findings`. |
 
 Everything new is optional, so the UI must still work when the backend leaves out `tip`, `confidence`,

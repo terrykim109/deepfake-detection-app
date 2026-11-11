@@ -1,4 +1,5 @@
-# detection/face_landmarks.py — locate the main face so demo regions land on real features
+# detection/face_landmarks.py — locate the main face and its landmarks so teachable
+# explanations can pick face-specific cues (see docs/TEACHABLE_HANDOFF.md §7)
 
 from __future__ import annotations
 

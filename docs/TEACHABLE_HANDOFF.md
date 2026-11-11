@@ -26,7 +26,7 @@ Frontend work needed to use this backend: see [TEACHABLE_FRONTEND_REQUIREMENTS.m
 | `backend/detection/base.py` | Adds `DetectionResult.explanation_method: str = ""`. |
 | `backend/detection/openrouter.py` | Prompt asks each finding for an optional `tip` and region `confidence`, listed **after** `x,y,w,h` so main's truncated-JSON recovery still matches. `_recover_findings_objects()` also picks up the optional `tip` / `confidence`. Coordinates use one scale per response via `_coord_scale()` (0–1, 0–100 or 0–1000, chosen from the largest value). This replaces main's per-value `_norm_coord()`, which could mis-scale a reply that mixed small and large numbers. `_region_confidence()` accepts 0–1 or 0–100 and drops anything else. `_combine()` sets `explanation_method = "AI vision model description (approximate areas)"` when findings exist. `_MAX_FINDINGS` stays at main's **3**. |
 | `backend/routers/analysis.py` | Adds `explanation_method` to `result` in the `/analysis/run` response (one line). |
-| `backend/detection/face_landmarks.py` (new) | `detect_face(bytes) -> FaceLandmarks or None`, using OpenCV `FaceDetectorYN`. Returns the face box and 5 landmarks (both eyes, nose, both mouth corners) in pixels, plus image width/height. Lazy singleton behind a lock. Returns `None` when the model file is missing, the image can't be decoded, or no face scores ≥ 0.6. **Nothing calls it yet.** It's here for the fallback in §7. |
+| `backend/detection/face_landmarks.py` (new) | `detect_face(bytes) -> FaceLandmarks or None`, using OpenCV `FaceDetectorYN`. Synchronous and CPU-bound, so call it via `asyncio.to_thread` from async code. Returns the face box and 5 landmarks (both eyes, nose, both mouth corners) in pixels, plus image width/height. Lazy singleton behind a lock. Returns `None` when the model file is missing, the image can't be decoded, or no face scores ≥ 0.6. **Nothing calls it yet.** It's here for the fallback in §7. |
 | `backend/detection/models/face_detection_yunet_2023mar.onnx` (new) | YuNet face detector from the OpenCV model zoo (MIT, ~230 KB, CPU, a few ms per image). |
 | `backend/detection/tests/test_findings.py` (new) | 27 tests. Region parsing: 0–1 / 0–100 / 0–1000 scaling, one scale per response, clipping, degenerate input, cap, optional `tip` / `confidence`. Truncated replies, with and without the new fields. `detect_face`: undecodable bytes, a blank image, a missing model file, and a real face (`backend/Sample photos/sample_deepfake.jpg`). |
 
@@ -158,16 +158,24 @@ These cues have **no coordinates**. `applies_because` tells the user why the cue
 of common AI characteristics, each with a condition evaluated against the image:
 
 - **Forensics results**: `routers/analysis.py` already gets `forensics_out` from
-  `asyncio.gather(...)`, so pass that in rather than running forensics again:
-  - `metadata` (`extract_metadata`): no `camera_make` / `camera_model` / `date_taken`, or a `software`
-    tag naming an editor or generator → "missing camera information" cue.
-  - `c2pa` (`check_c2pa`): `found` with a `claim_generator` naming a generator tool → a cue that cites it.
-  - `noise` (`analyze_noise`): low `std_block_variance` or a high `outlier_block_count` →
-    "unnaturally even noise" cue.
-  - `ela` (`generate_ela`): uneven error levels → "regions compressed differently" cue.
+  `asyncio.gather(...)`, so pass that in rather than running forensics again. `forensics_out` is
+  `None` if forensics failed entirely. Each section has `"available": False` (plus `"error"`) when that
+  check failed, except `c2pa`, which reports failures as `"found": False`. The fields each section returns:
+  - `metadata` (`extract_metadata`): `camera_make`, `camera_model`, `date_taken`, `software`, `has_gps`,
+    `file_info{format, width, height, mode}`. Missing camera fields, or a `software` tag naming an
+    editor or generator → "missing camera information" cue.
+  - `c2pa` (`check_c2pa`): `found`, `claim_generator`. A `claim_generator` naming a generator tool → a
+    cue that cites it.
+  - `noise` (`analyze_noise`): `mean_block_variance`, `std_block_variance`, `outlier_block_count`. A low
+    `std_block_variance` → "unnaturally even noise" cue; many outlier blocks → "patchy noise" cue.
+  - `ela` (`generate_ela`): `mean_error`, `max_error` (plus a base64 preview image). A `max_error` far
+    above `mean_error` → "some areas were compressed differently" cue. Tune the thresholds on
+    `backend/Sample photos/`.
   - Dimensions (`metadata.file_info`): square, or a typical generator size (512 / 768 / 1024) → mild cue.
-- **A face is found** (`face_landmarks.detect_face(image_bytes)`, fast and already on this branch):
-  face-specific cues (§7.3).
+- **A face is found** (`face_landmarks.detect_face(...)`, already on this branch): face-specific cues
+  (§7.3). In `run_analysis` the uploaded bytes are still in memory as `data` after the `gather`.
+  Deleting the temp file doesn't affect them, so call
+  `await asyncio.to_thread(detect_face, data)`. It's CPU-bound, so don't block the event loop.
 - **No face found:** scene cues such as background coherence, repeated textures, warped straight lines
   or architecture, garbled text or signage, hands / fingers when people are present, and inconsistent
   shadows or lighting.
@@ -177,7 +185,9 @@ of common AI characteristics, each with a condition evaluated against the image:
   `"general guidance (no specific regions found)"`.
 
 **Wiring:** call it once in `routers/analysis.py` after the `gather`, for both the success and the
-`partial` path. Treat each forensics section as optional, like `run_forensics()` does, so a failing
+`partial` path. On the partial path `result_payload` is `None`, so return the cues at the top level of
+the response (e.g. `"general_cues"` next to `"forensics"`) or create a minimal result for them, and tell
+the frontend which one you chose. Treat each forensics section as optional, like `run_forensics()` does, so a failing
 signal skips its cue instead of failing the analysis. Add the module to the response in both places.
 
 ### 7.3 Starter content: face cues (from the removed stub)
