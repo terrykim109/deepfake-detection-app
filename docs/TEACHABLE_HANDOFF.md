@@ -207,7 +207,8 @@ If you want **located** face cues, the removed stub sized boxes from the landmar
 - **jaw:** from 0.35 · `eye_gap` below the mouth to 1.06 × face height, 80% of face width.
 - **hair:** a band 20% of face height tall, starting 10% above the face box.
 
-The full code is in this branch's history: `git show 998f50b:backend/detection/stub.py`.
+The full code is in this branch's history: `git show f5119a8:backend/detection/stub.py`
+(or find it with `git log --oneline -- backend/detection/stub.py`).
 
 ### 7.4 Tests to add
 
