@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  updatePassword,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { authApi, setTokenGetter, type UserResponse } from "../api/client";
-import { auth, storage } from "../firebase";
+import { auth } from "../firebase";
+import { CURRENT_PASSWORD_WRONG, USERNAME_TAKEN } from "./accountRules";
 import {
   clearLastActivity,
   useInactivityTimeout,
@@ -62,10 +64,6 @@ function firebaseAuthErrorMessage(err: unknown): string {
       return "Please enter a valid email address.";
     case "auth/missing-email":
       return "Enter your email address to continue.";
-    case "storage/unauthorized":
-      return "You don't have permission to change this photo. Please log in again.";
-    case "storage/quota-exceeded":
-      return "Photo storage is full right now. Please try again later.";
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found":
@@ -73,11 +71,6 @@ function firebaseAuthErrorMessage(err: unknown): string {
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a moment and try again.";
     default:
-      // Any other Storage failure (offline, cancelled, no bucket) gets one
-      // plain message instead of Firebase's "Firebase Storage: ... (storage/x)"
-      if (code.startsWith("storage/")) {
-        return "Couldn't update your photo. Please try again.";
-      }
       return err instanceof Error
         ? err.message
         : "Something went wrong. Please try again.";
@@ -85,10 +78,8 @@ function firebaseAuthErrorMessage(err: unknown): string {
 }
 
 export interface Profile {
-  firstName: string;
-  lastName: string;
+  username: string;
   email: string;
-  phone: string;
 }
 
 export interface AuthState {
@@ -99,38 +90,28 @@ export interface AuthState {
   saving: boolean;
   error: string;
   sessionTimeoutMinutes: number;
-  /** Profile photo URL from Firebase Auth; null when the user has none. */
-  photoURL: string | null;
 }
 
 export interface AuthActions {
-  signUp: (
-    email: string,
-    password: string,
-    displayName?: string,
-  ) => Promise<void>;
+  signUp: (email: string, password: string, username: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: (opts?: { reason?: "manual" | "inactivity" }) => Promise<void>;
   updateProfile: (next: Profile) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  updateAvatar: (image: Blob) => Promise<void>;
-  removeAvatar: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   clearError: () => void;
 }
 
 function emptyProfile(): Profile {
-  return { firstName: "", lastName: "", email: "", phone: "" };
+  return { username: "", email: "" };
 }
 
 function buildProfile(user: UserResponse | null): Profile {
   if (!user) return emptyProfile();
-  const names = (user.display_name || "").split(" ");
   return {
-    firstName: user.first_name || names[0] || "",
-    lastName: user.last_name || names.slice(1).join(" ") || "",
+    username: user.username || "",
     email: user.email || "",
-    phone: user.phone || "",
   };
 }
 
@@ -139,7 +120,7 @@ function applyUser(
   fallback?: Profile | UserResponse | null,
 ): UserResponse {
   const fb =
-    fallback && "firstName" in fallback
+    fallback && !("user_id" in fallback)
       ? fallback
       : fallback
         ? buildProfile(fallback)
@@ -147,9 +128,7 @@ function applyUser(
   return {
     ...user,
     email: user.email || fb.email || "",
-    first_name: user.first_name || fb.firstName || "",
-    last_name: user.last_name || fb.lastName || "",
-    phone: user.phone || fb.phone || "",
+    username: user.username || fb.username || "",
   };
 }
 
@@ -164,20 +143,6 @@ export function useAuth(): AuthState & AuthActions {
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(
     DEFAULT_TIMEOUT_MINUTES,
   );
-  // Keyed by uid: Firebase Auth keeps its own session, which can outlive
-  // our sessionStorage one, so only trust a photo that belongs to `user`.
-  const [photo, setPhoto] = useState<{ uid: string; url: string | null } | null>(
-    null,
-  );
-
-  useEffect(
-    () =>
-      onAuthStateChanged(auth, (fbUser) => {
-        setPhoto(fbUser ? { uid: fbUser.uid, url: fbUser.photoURL } : null);
-      }),
-    [],
-  );
-
   useEffect(() => {
     setTokenGetter(() => {
       try {
@@ -294,18 +259,24 @@ export function useAuth(): AuthState & AuthActions {
   );
 
   const signUp = useCallback(
-    async (email: string, password: string, displayName?: string) => {
+    async (email: string, password: string, username: string) => {
       setLoading(true);
       setError("");
       try {
+        // Early check so a taken name is caught before the account exists.
+        // The backend claims the name for real on the first verified login.
+        const check = await authApi.usernameAvailable(username);
+        if (check.error) throw new Error(check.error);
+        if (!check.data?.available) {
+          throw new Error(check.data?.detail || USERNAME_TAKEN);
+        }
         const credential = await createUserWithEmailAndPassword(
           auth,
           email,
           password,
         );
-        if (displayName) {
-          await updateFirebaseProfile(credential.user, { displayName });
-        }
+        // Carried to the backend as the display name on first sync
+        await updateFirebaseProfile(credential.user, { displayName: username });
         try {
           await sendEmailVerification(credential.user);
         } catch {
@@ -396,10 +367,8 @@ export function useAuth(): AuthState & AuthActions {
       const res = await authApi.updateProfile(
         user.user_id,
         {
-          first_name: next.firstName,
-          last_name: next.lastName,
+          username: next.username,
           email: next.email,
-          phone: next.phone,
         },
         token,
       );
@@ -413,11 +382,9 @@ export function useAuth(): AuthState & AuthActions {
       const updatedUser = applyUser(
         res.data || {
           ...user,
-          display_name: `${next.firstName} ${next.lastName}`.trim(),
+          display_name: next.username,
           email: next.email,
-          first_name: next.firstName,
-          last_name: next.lastName,
-          phone: next.phone,
+          username: next.username,
         },
         next,
       );
@@ -459,46 +426,46 @@ export function useAuth(): AuthState & AuthActions {
     }
   }, []);
 
-  const signedInFirebaseUser = useCallback(() => {
-    const fbUser = auth.currentUser;
-    if (!fbUser || fbUser.uid !== user?.user_id) {
-      throw new Error("Please log in again to change your photo.");
-    }
-    return fbUser;
-  }, [user]);
-
-  const updateAvatar = useCallback(
-    async (image: Blob) => {
-      const fbUser = signedInFirebaseUser();
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      // Firebase restores its session asynchronously after a reload
+      await auth.authStateReady();
+      const fbUser = auth.currentUser;
+      if (!fbUser?.email || fbUser.uid !== user?.user_id) {
+        throw new Error("Please log in again to change your password.");
+      }
       try {
-        const avatarRef = ref(storage, `avatars/${fbUser.uid}`);
-        await uploadBytes(avatarRef, image, { contentType: image.type });
-        const url = await getDownloadURL(avatarRef);
-        await updateFirebaseProfile(fbUser, { photoURL: url });
-        setPhoto({ uid: fbUser.uid, url });
+        // Firebase only allows a password change right after signing in,
+        // and this also proves the current password.
+        await reauthenticateWithCredential(
+          fbUser,
+          EmailAuthProvider.credential(fbUser.email, currentPassword),
+        );
+      } catch (err) {
+        const code =
+          err && typeof err === "object" && "code" in err
+            ? String((err as { code: unknown }).code)
+            : "";
+        if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
+          throw new Error(CURRENT_PASSWORD_WRONG);
+        }
+        throw new Error(firebaseAuthErrorMessage(err));
+      }
+      try {
+        await updatePassword(fbUser, newPassword);
+        // The change revokes older tokens and the backend checks revocation,
+        // so swap in a fresh one before the next API call.
+        const idToken = await fbUser.getIdToken(true);
+        sessionStorage.setItem(TOKEN_KEY, idToken);
+        setTokenGetter(() => idToken);
+        setToken(idToken);
+        if (user) saveStored(idToken, user);
       } catch (err) {
         throw new Error(firebaseAuthErrorMessage(err));
       }
     },
-    [signedInFirebaseUser],
+    [user],
   );
-
-  const removeAvatar = useCallback(async () => {
-    const fbUser = signedInFirebaseUser();
-    // Unlink first: if the delete below fails we leave an unseen orphan file,
-    // not a profile pointing at a missing image.
-    try {
-      await updateFirebaseProfile(fbUser, { photoURL: null });
-      setPhoto({ uid: fbUser.uid, url: null });
-    } catch (err) {
-      throw new Error(firebaseAuthErrorMessage(err));
-    }
-    try {
-      await deleteObject(ref(storage, `avatars/${fbUser.uid}`));
-    } catch {
-      // Nothing links to the file any more, and the next upload overwrites it
-    }
-  }, [signedInFirebaseUser]);
 
   // Inactivity auto-logout
   useInactivityTimeout(
@@ -517,15 +484,13 @@ export function useAuth(): AuthState & AuthActions {
     saving,
     error,
     sessionTimeoutMinutes,
-    photoURL: photo && photo.uid === user?.user_id ? photo.url : null,
     signUp,
     signIn,
     signOut,
     updateProfile,
     resendVerificationEmail,
     sendPasswordReset,
-    updateAvatar,
-    removeAvatar,
+    changePassword,
     clearError,
   };
 }

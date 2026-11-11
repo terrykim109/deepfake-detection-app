@@ -444,11 +444,8 @@
 /* No opacity fade: the default 0.45 drops the label to 3.2:1 (light) / 2.8:1 (dark) */
 .upload-cta:disabled { opacity: 1; background: var(--subtle-bg); border-color: var(--borders); color: var(--secondary-text); }
 .upload-cta:disabled .ui-spinner { border-color: color-mix(in srgb, var(--secondary-text) 25%, transparent); border-top-color: var(--secondary); }
-.upload-quota, .upload-slow { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); }
-.upload-quota { color: var(--secondary-text); }
-.upload-slow { color: var(--text); }
-.upload-quota svg, .upload-slow svg { width: 16px; height: 16px; flex-shrink: 0; }
-.upload-slow svg { color: var(--alert-warning-fg); }
+.upload-slow { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text); }
+.upload-slow svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--alert-warning-fg); }
 
 @media (max-width: 1023px) {
   .upload-card__body { grid-template-columns: minmax(0, 1fr); }
@@ -864,7 +861,7 @@
   border-radius: 50%;
   background: var(--primary);
   color: #fff;
-  /* outline-style ring so the photo keeps its full size */
+  /* ring drawn with box-shadow so it adds no layout size */
   box-shadow: 0 0 0 3px var(--background), 0 0 0 6px var(--accent);
   display: flex;
   align-items: center;
@@ -873,45 +870,12 @@
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-.profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.profile-avatar:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--background), 0 0 0 6px var(--accent), var(--focus-ring); }
-.profile-avatar:disabled { cursor: progress; }
-.profile-avatar__badge {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--btn-dark);
-  border: 3px solid var(--background);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.profile-avatar__badge svg { width: 20px; height: 20px; }
 
-.profile-identity { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.profile-identity { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+/* Bottom edge lines up with the avatar's ring, which the box-shadow draws 6px below the circle */
+.profile-logout { flex-shrink: 0; min-width: 120px; align-self: flex-end; margin-bottom: -6px; }
 .profile-name { font-size: var(--fs-3xl); font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
 .profile-email { font-size: 0.9375rem; color: var(--secondary-text); overflow-wrap: anywhere; }
-.profile-photo-links { display: flex; flex-wrap: wrap; gap: var(--space-4); padding-top: var(--space-1); }
-.profile-photo-links .ui-btn--link { font-size: var(--fs-sm); font-weight: 600; text-decoration: none; }
-.profile-photo-links .ui-btn--link:not(:disabled):hover { text-decoration: underline; }
-.profile-photo-links .profile-remove { color: var(--alert-error-fg); }
-
-.profile-pending {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 14px var(--space-5);
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-  background: var(--accent-soft-bg);
-}
-.profile-pending__text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; }
-.profile-pending__text span { font-size: 0.8125rem; color: var(--secondary-text); }
 
 /* Subtle 1px border from .ui-card, no shadow */
 .profile-card { display: flex; flex-direction: column; gap: var(--space-5); border-radius: 16px; }
@@ -938,15 +902,19 @@
 .profile-status--saved { color: var(--alert-success-fg); }
 .profile-card__footer .ui-btn { min-width: 180px; }
 
-.profile-footer { display: flex; justify-content: flex-end; }
-.profile-footer .ui-btn { min-width: 160px; }
+.profile-password { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.profile-password .ui-btn { min-width: 180px; }
+
+/* The dialog centres its text; the form fields read left-aligned */
+.password-form { width: 100%; display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-2); text-align: left; }
+
 
 @media (max-width: 767px) {
   .profile-head { flex-direction: column; text-align: center; }
-  .profile-photo-links { justify-content: center; }
+  .profile-logout { align-self: center; margin-bottom: 0; }
   .profile-fields { grid-template-columns: minmax(0, 1fr); }
-  .profile-card__footer .ui-btn, .profile-footer .ui-btn { flex: 1 1 100%; }
-  .profile-pending .ui-btn { flex: 1 1 0; }
+  .profile-card__footer .ui-btn { flex: 1 1 100%; }
+  .profile-password { flex-direction: column; align-items: stretch; }
 }
 
 /* ───────────── Style guide (/styleguide) ───────────── */

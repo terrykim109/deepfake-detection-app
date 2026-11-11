@@ -98,6 +98,7 @@ export interface UserResponse {
   user_id: string
   email: string
   display_name: string | null
+  username?: string
   first_name?: string
   last_name?: string
   phone?: string
@@ -298,9 +299,15 @@ export const authApi = {
 
   updateProfile: (
     userId: string,
-    profile: { first_name?: string; last_name?: string; email?: string; phone?: string },
+    profile: { username: string; email?: string },
     token?: string | null,
   ) => put<UserResponse>(`/api/users/${userId}/profile`, profile, token),
+
+  // Public: sign-up runs before the user has a token
+  usernameAvailable: (username: string) =>
+    get<{ available: boolean; detail: string }>(
+      `/api/users/username-available?username=${encodeURIComponent(username)}`,
+    ),
 }
 
 export const analysisApi = {
