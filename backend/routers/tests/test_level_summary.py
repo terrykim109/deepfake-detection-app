@@ -242,17 +242,6 @@ def test_failed_detector_summary_requires_failure_disclosure():
     assert any("main detection did not complete" in violation for violation in violations)
 
 
-def test_style_violations_are_retry_only_but_safety_violations_remain_hard():
-    violations = [
-        "word count is 220; required range is 250-400",
-        "paragraph count is 1; required range is 2-4",
-        "contains prohibited phrase: score of 0",
-    ]
-    assert level_summary._hard_summary_violations(violations) == [
-        "contains prohibited phrase: score of 0",
-    ]
-
-
 @pytest.mark.parametrize("text", [
     "The right side is clear.",
     "The file does not contain camera details.",
@@ -260,7 +249,7 @@ def test_style_violations_are_retry_only_but_safety_violations_remain_hard():
     "The check found 48 of 1,184 patches using 16-pixel blocks.",
 ])
 def test_repair_does_not_rewrite_sentence_content(text):
-    assert level_summary._repair_summary(text, "beginner") == text
+    assert level_summary._repair_summary(text) == text
 
 
 @pytest.mark.parametrize("text", [
@@ -269,24 +258,23 @@ def test_repair_does_not_rewrite_sentence_content(text):
     "The supplied rule was applied.",
     "The check found 48 of 1,184 patches using 16-pixel blocks.",
 ])
-def test_unfixable_content_remains_a_hard_violation(text):
-    repaired = level_summary._repair_summary(text, "beginner")
+def test_unfixable_content_remains_a_violation(text):
+    repaired = level_summary._repair_summary(text)
     violations = REAL_SUMMARY_VALIDATOR(repaired, "beginner")
-    assert level_summary._hard_summary_violations(violations)
+    assert violations
 
 
 def test_repair_keeps_only_safe_formatting_changes():
     text = "# Summary\n- Count 1184 blocks.\n\nTwo.\n\nThree.\n\nFour.\n\nFive."
-    repaired = level_summary._repair_summary(text, "technical")
+    repaired = level_summary._repair_summary(text)
     assert repaired.startswith("Summary\nCount 1,184 blocks.")
-    assert len(re.split(r"\n\s*\n", repaired)) == 4
-    assert repaired.endswith("Four. Five.")
+    assert len(re.split(r"\n\s*\n", repaired)) == 5
+    assert repaired.endswith("Five.")
 
 
 def test_repair_may_append_only_required_disclosures():
     repaired = level_summary._repair_summary(
         "The available checks are inconclusive.",
-        "intermediate",
         detector_failed=True,
         compression_cue=True,
     )
