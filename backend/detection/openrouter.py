@@ -1,4 +1,4 @@
-# detection/openrouter.py — ensemble of free OpenRouter vision models
+# OpenRouter vision-model ensemble provider
 
 from __future__ import annotations
 
@@ -17,11 +17,10 @@ from detection.base import DetectionError, DetectionResult
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _TIMEOUT_SECONDS = 45.0
-_MAX_TOKENS = 600
-_TEMPERATURE = 0.2
-_MAX_FINDINGS = 4
-
-# Added: differences this large between model scores trigger an inconclusive result
+# Room for verdict/summary plus up to 3 region findings (truncated JSON drops findings).
+_MAX_TOKENS = 1600
+_TEMPERATURE = 0.2  # Keep responses relatively consistent
+_MAX_FINDINGS = 3  # Maximum suspicious regions retained per result
 _DISAGREEMENT_THRESHOLD = 30
 
 _PROMPT = """You are an image forensics assistant helping detect AI-generated or digitally manipulated photos.
@@ -29,13 +28,13 @@ _PROMPT = """You are an image forensics assistant helping detect AI-generated or
 Analyze the image for deepfake / AI-generation / heavy editing cues (unnatural textures, inconsistent lighting, warped anatomy, compression artifacts, etc.).
 
 Respond with ONLY valid JSON (no markdown, no extra text):
-{"verdict":"real"|"warn"|"fake","confidence":0-100,"summary":"one short sentence","findings":[{"label":"short title","explanation":"one tentative sentence","tip":"what the user should check when zoomed in","confidence":0-100,"x":0.0,"y":0.0,"w":0.0,"h":0.0}]}
+{"verdict":"real"|"warn"|"fake","confidence":0-100,"summary":"one short sentence","findings":[{"label":"short title","explanation":"one tentative sentence","x":0.0,"y":0.0,"w":0.0,"h":0.0,"tip":"what the user should check when zoomed in","confidence":0-100}]}
 
 Rules:
 - confidence is manipulation likelihood: 0 = clearly authentic, 100 = clearly fake/AI-generated.
 - verdict "fake" for strong manipulation signals, "warn" for inconclusive/mixed, "real" for little evidence of manipulation.
 - summary must be one plain-English sentence suitable for end users.
-- findings: up to 4 suspicious regions. Use empty [] when verdict is "real".
+- findings: up to 3 suspicious regions. Use empty [] when verdict is "real".
 - x,y,w,h are normalized 0–1 relative to the full image (x,y = top-left of the region).
 - explanations must be tentative cues (not definitive proof), e.g. "this area looks inconsistent because…".
 - each finding's confidence is how suspicious that region is, 0–100.
@@ -65,17 +64,18 @@ _FALLBACK_SUMMARIES = {
 
 @dataclass(frozen=True, slots=True)
 class _ModelScore:
+    """Store one model's assessment before ensemble aggregation."""
     model: str
     verdict: str
     confidence: int
     summary: str
     findings: list[dict[str, Any]] = field(default_factory=list)
 
-
+# Keep normalized coordinates within the 0–1 range
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
-
+# Use the supplied image type, falling back to the filename or JPEG.
 def _normalize_content_type(content_type: str | None, filename: str | None) -> str:
     if content_type and content_type.startswith("image/"):
         return content_type.split(";")[0].strip().lower()
@@ -107,13 +107,90 @@ def _extract_json(text: str) -> dict:
 
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as original_error:
         match = re.search(r"\{.*\}", text, re.DOTALL)
 
-        if not match:
-            raise
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
 
-        return json.loads(match.group(0))
+        # Some free vision models stop mid-JSON at their output-token limit.
+        # Recover required fields and any complete finding objects that made it through.
+        verdict_match = re.search(
+            r'"verdict"\s*:\s*"(?P<value>[^"]+)"',
+            text,
+            re.IGNORECASE,
+        )
+        confidence_match = re.search(
+            r'"confidence"\s*:\s*(?P<value>-?\d+(?:\.\d+)?)',
+            text,
+            re.IGNORECASE,
+        )
+        summary_match = re.search(
+            r'"summary"\s*:\s*"(?P<value>(?:\\.|[^"\\])*)',
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+
+        if not (verdict_match and confidence_match and summary_match):
+            raise original_error
+
+        try:
+            summary = json.loads(f'"{summary_match.group("value")}"').strip()
+        except json.JSONDecodeError:
+            summary = summary_match.group("value").strip()
+
+        return {
+            "verdict": verdict_match.group("value"),
+            "confidence": confidence_match.group("value"),
+            "summary": summary,
+            "findings": _recover_findings_objects(text),
+        }
+
+
+def _recover_findings_objects(text: str) -> list[dict[str, Any]]:
+    """Pull complete finding objects out of truncated model JSON."""
+    recovered: list[dict[str, Any]] = []
+    pattern = re.compile(
+        r'\{\s*"label"\s*:\s*"(?P<label>(?:\\.|[^"\\])*)"\s*,\s*'
+        r'"explanation"\s*:\s*"(?P<explanation>(?:\\.|[^"\\])*)"\s*,\s*'
+        r'"x"\s*:\s*(?P<x>-?\d+(?:\.\d+)?)\s*,\s*'
+        r'"y"\s*:\s*(?P<y>-?\d+(?:\.\d+)?)\s*,\s*'
+        r'"w"\s*:\s*(?P<w>-?\d+(?:\.\d+)?)\s*,\s*'
+        r'"h"\s*:\s*(?P<h>-?\d+(?:\.\d+)?)'
+        # Optional teachable extras, listed after the box in the prompt
+        r'(?:\s*,\s*"tip"\s*:\s*"(?P<tip>(?:\\.|[^"\\])*)")?'
+        r'(?:\s*,\s*"confidence"\s*:\s*(?P<confidence>-?\d+(?:\.\d+)?))?\s*\}',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in pattern.finditer(text):
+        if len(recovered) >= _MAX_FINDINGS:
+            break
+        try:
+            label = json.loads(f'"{match.group("label")}"').strip()
+            explanation = json.loads(f'"{match.group("explanation")}"').strip()
+        except json.JSONDecodeError:
+            label = match.group("label").strip()
+            explanation = match.group("explanation").strip()
+        item = {
+            "label": label,
+            "explanation": explanation,
+            "x": match.group("x"),
+            "y": match.group("y"),
+            "w": match.group("w"),
+            "h": match.group("h"),
+        }
+        if match.group("tip"):
+            try:
+                item["tip"] = json.loads(f'"{match.group("tip")}"')
+            except json.JSONDecodeError:
+                item["tip"] = match.group("tip")
+        if match.group("confidence"):
+            item["confidence"] = match.group("confidence")
+        recovered.append(item)
+    return recovered
 
 
 _COORD_KEYS = ("x", "y", "w", "h")
@@ -126,19 +203,23 @@ def _coord(item: dict, key: str, scale: float) -> float:
 
 def _coord_scale(items: list) -> float:
     """
-    Some vision models answer in 0–1000 despite the prompt. If any coordinate
-    in the response is above 1, treat the whole response as 0–1000 so every
-    box from that model is scaled the same way.
+    Some vision models answer in 0–100 percentages or 0–1000 despite the prompt.
+    Pick one scale from the largest coordinate in the response so every box
+    from that model is scaled the same way.
     """
+    largest = 0.0
     for item in items:
         if not isinstance(item, dict):
             continue
         for key in _COORD_KEYS:
             try:
-                if float(item.get(key)) > 1:
-                    return 1000.0
+                largest = max(largest, float(item.get(key)))
             except (TypeError, ValueError):
                 continue
+    if largest > 100:
+        return 1000.0
+    if largest > 1:
+        return 100.0
     return 1.0
 
 
@@ -187,7 +268,7 @@ def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
         w = min(w, 1.0 - x)
         h = min(h, 1.0 - y)
 
-        if w <= 0 or h <= 0:
+        if w <= 0.01 or h <= 0.01:
             continue
 
         finding: dict[str, Any] = {
@@ -223,11 +304,13 @@ def _parse_model_payload(model: str, payload: dict) -> _ModelScore:
     content = message.get("content")
 
     if isinstance(content, list):
-        parts = [
-            p.get("text", "")
-            for p in content
-            if isinstance(p, dict)
-        ]
+        parts = []
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            text = part.get("text")
+            if isinstance(text, str):
+                parts.append(text)
         content = "\n".join(parts)
 
     if not isinstance(content, str):
@@ -431,13 +514,11 @@ def _combine(scores: list[_ModelScore]) -> DetectionResult:
                 f"score {confidence}/100.)"
             )
 
-    # Removed the old artificial minimum of 55 for "real" results.
-    # The returned score now matches the ensemble's median score.
-    findings = (
-        _pick_findings(scores, confidence)
-        if verdict != "real"
-        else []
-    )
+    # Keep region cues whenever any model supplied them, unless every model
+    # agreed the image looks real (ensemble verdict real + no warn/fake votes).
+    findings = _pick_findings(scores, confidence)
+    if verdict == "real" and not any(s.verdict in {"warn", "fake"} for s in scores):
+        findings = []
 
     return DetectionResult(
         verdict=verdict,
@@ -523,11 +604,14 @@ class OpenRouterEnsembleDetector:
         # Keep using any successful model results rather than failing
         # the entire analysis because one or two providers were unavailable.
         if not scores:
-            joined = "; ".join(errors[:3]) if errors else "unknown error"
-
+            # Keep technical provider errors in server logs only.
+            print(
+                "[openrouter] all models failed: "
+                + ("; ".join(errors[:3]) if errors else "unknown error")
+            )
             raise DetectionError(
-                "The vision analysis service could not complete this request. "
-                f"All models failed ({joined})."
+                "We couldn't analyze this image right now. "
+                "Please try again in a moment."
             )
 
         return _combine(scores)

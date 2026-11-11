@@ -1,130 +1,112 @@
 # Teachable Feature — Frontend Requirements
 
 Companion to [TEACHABLE_HANDOFF.md](TEACHABLE_HANDOFF.md) (backend). This document lists the frontend
-components and changes users need to interact with the teachable backend. **No frontend code is on this
-branch.** Everything below is still to be built (or merged; see §7).
+components and changes users need to interact with the teachable backend. **The frontend on this branch
+is identical to `main`.** Everything in §2–§4 is still to be built, on top of `main`'s current components.
 
-## 1. What already exists on `main`
+## 1. What `main` already has
 
-- `frontend/src/components/ImageZoom.tsx`: a zoomable image (100–400%, buttons, wheel, drag to pan). It
-  draws numbered marker boxes from `findings` and has a built-in explanation panel for the selected
-  finding.
-- `frontend/src/detection/detector.ts`: `Finding { id, label, explanation, x, y, w, h }`, and
-  `Detection.findings?`.
-- `frontend/src/detection/httpDetector.ts`: maps `result.findings` from `/analysis/run`.
-- `frontend/src/state/AppState.tsx`: keeps `findings` on `currentResult` for the session; `toHistorySafe()`
-  strips them before saving to History.
-- `frontend/src/pages/Results.tsx`: renders `<ImageZoom src alt findings />` in the preview column.
+- **`frontend/src/components/ImageZoom.tsx`:** a zoomable image (100–400%, buttons, wheel, drag to pan).
+  - Draws numbered marker boxes from `findings`. The outline-only style lets the actual image show through.
+  - **Auto-selects the first finding.**
+  - **Clicking a marker zooms in on that region** (`zoomToFinding`, about 70% fit, at least 200%).
+  - Has a built-in explanation panel below the image: label, explanation, and a "Model-suggested cue —
+    not definitive proof" note.
+- **`frontend/src/detection/detector.ts`:** `Finding { id, label, explanation, x, y, w, h }`, and
+  `Detection.findings?`. `Detection` also carries `onlineSearch` and `forensics`.
+- **`frontend/src/detection/httpDetector.ts`:** maps `result.findings` from `/analysis/run`. On a
+  `partial` response (detection failed) it sets `findings: []`.
+- **`frontend/src/state/AppState.tsx`:** keeps `findings` on `currentResult` for the session;
+  `toHistorySafe()` strips them before saving to History.
+- **`frontend/src/pages/Results.tsx`:** `<ImageZoom src alt findings />` in the preview column, plus
+  `OnlineSearchPanel` and `ForensicsPanel` further down the page.
 
 ## 2. Data plumbing (types and mapping)
 
 | File | Change |
 |---|---|
-| `frontend/src/api/client.ts` | On `AnalysisFindingPayload` add `confidence?: number` and `tip?: string`. On `AnalysisRunResultPayload` add `explanation_method?: string`, and `general_cues?: GeneralCuePayload[]` once the backend fallback ships. |
-| `frontend/src/detection/detector.ts` | On `Finding` add `confidence?: number` (0–100) and `tip?: string`. Add a `GeneralCue { id, label, explanation, tip?, appliesBecause? }` type. On `Detection` add `explanationMethod?: string` and `generalCues?: GeneralCue[]`. |
-| `frontend/src/detection/httpDetector.ts` | Map `explanation_method → explanationMethod` and `general_cues → generalCues` (convert `applies_because` → `appliesBecause`, default `[]`). |
+| `frontend/src/api/client.ts` | Extend the finding payload type with `tip?: string` and `confidence?: number`. On the run result payload add `explanation_method?: string`, and `general_cues?: GeneralCuePayload[]` once the backend fallback ships. |
+| `frontend/src/detection/detector.ts` | On `Finding` add `tip?: string` and `confidence?: number` (0–100). Add `GeneralCue { id, label, explanation, tip?, appliesBecause? }`. On `Detection` add `explanationMethod?: string` and `generalCues?: GeneralCue[]`. |
+| `frontend/src/detection/httpDetector.ts` | Map `explanation_method → explanationMethod` and `general_cues → generalCues` (`applies_because → appliesBecause`, default `[]`). Do this for the `partial` path too, because the fallback can return cues even when detection failed. |
 | `frontend/src/state/AppState.tsx` | Copy `explanationMethod` and `generalCues` onto `currentResult`. Keep them out of History (`toHistorySafe()`), the same as `findings`. |
 
-Everything new is optional, so the UI must still work when a provider leaves out `tip`, `confidence` or
-`general_cues`.
+Everything new is optional, so the UI must still work when the backend leaves out `tip`, `confidence`,
+`explanation_method` or `general_cues`.
 
 ## 3. Components required
 
-### 3.1 `TeachableView` (new; replaces `ImageZoom` in `Results.tsx`)
+### 3.1 Teachable panel (new component, e.g. `TeachablePanel.tsx`)
 
-`<TeachableView src alt result />`, laid out in two columns (image about 60%, panel about 40%). It
-collapses to one column at ≤ 860px.
+The panel sits next to the image on desktop and below it on narrow screens (≤ 860px). It replaces
+ImageZoom's built-in panel (see §3.2). It contains:
 
-**Left column**
-
-- The zoomable image with region markers (`ImageZoom`, see §3.2).
-- **Show / hide heatmap** toggle (`aria-pressed`).
-- **Clear selection** button (zooms back to 100% and deselects).
-- A short usage hint, e.g. "Hover a region to preview it, click to zoom in. On touch, tap a marker or a
-  region in the list."
-
-**Right column (panel)**
-
-1. **Verdict block:** verdict label, confidence %, `Explanation method: {explanationMethod}`, and
-   "N regions flagged". Tint it by verdict (real / warn / fake).
+1. **Verdict line:** verdict label, confidence %, "Explanation method: {explanationMethod}", and
+   "N regions flagged".
 2. **Flagged regions list:** an ordered list of buttons, each with a number badge matching the marker,
-   the label, and the region confidence % if present. Clicking one selects it and **animates the image to
-   zoom in on that region**. The selected item shows `aria-pressed`.
-3. **Detail card** (`aria-live="polite"`) for the selected region: title with badge, explanation,
-   **"What to check:"** tip (if present), "Region confidence: N%" (if present) and "Approximate area,
-   not an exact outline." With nothing selected: "Select a region to see why it was flagged."
-4. **General cues section**, needed once the backend fallback ships (see §4).
-5. **Honesty note:** "These regions show where to look, not proof that the image is fake." If
-   `explanationMethod` contains "mock", add: "In this demo they are example cues, not real model output."
-   Otherwise add: "They are approximate, and real photos can show the same cues."
+   the label, and the region confidence % if present. Clicking one selects it and **zooms the image to that
+   region** (reuse ImageZoom's `zoomToFinding`, see §3.2). The selected item shows `aria-pressed`.
+3. **Detail card** (`aria-live="polite"`) for the selected region: label, explanation,
+   **"What to check:"** tip (if present), "Region confidence: N%" (if present), and "Approximate area, not
+   an exact outline."
+4. **General cues section** (§4).
+5. **Honesty note:** "These areas show where to look, not proof that the image is fake. They are
+   approximate, and real photos can show the same signs."
 
-Pre-select the first finding on load.
-
-### 3.2 `ImageZoom` (extend the existing component)
+### 3.2 `ImageZoom.tsx` (extend, don't replace)
 
 | Requirement | Why |
 |---|---|
-| Expose an imperative handle via `forwardRef`: `frame(id)` (animate the zoom to fit that region and select it) and `reset()` | So the panel list can drive the image |
-| Controlled selection: props `activeId` + `onActiveChange`, still working uncontrolled if they're omitted | So the panel and image stay in sync |
-| `showPanel` prop (default `true`) to hide the built-in explanation panel | `TeachableView` renders its own panel |
-| `showHeatmap` prop: one soft radial glow per region, opacity based on `confidence` (default about 60) | Heatmap toggle. The backend has no saliency data, so this is cosmetic; label it that way |
-| Draw markers outside the scaled image, projected to screen pixels | Borders and badges keep the same size at every zoom level |
-| Hover tooltip (mouse/pen only) with label, explanation and confidence; flip above or below and clamp to the viewport | Quick preview without clicking |
-| Click a marker → animated zoom to that region (about 300 ms; jump instantly if `prefers-reduced-motion`) | The core "teach by zooming in" interaction |
-| Ignore the click if the pointer moved more than about 4 px (it was a pan) | So panning over a large marker doesn't trigger a zoom |
-| While zoomed in, auto-select the region under the viewport center | Panning around updates the explanation |
-| Overlapping regions: the smallest box under the pointer wins | Nested regions stay reachable |
-| Keyboard: markers are buttons, focus selects, Enter frames | Accessibility |
+| Lift the selection out: add props `activeId` + `onActiveChange`, keeping today's internal state when they're omitted | So the panel list and the markers stay in sync |
+| Let a parent trigger `zoomToFinding(id)` and a reset, e.g. via `forwardRef` + `useImperativeHandle` | So clicking a list item zooms the image |
+| `showPanel` prop (default `true`) to hide the built-in explanation panel | The teachable panel replaces it, while other uses keep today's behaviour |
+| Show the tip and confidence in the built-in panel when present | Cheap win if the full panel isn't built yet |
+| Optional: hover tooltip on markers (mouse/pen only) with label + explanation | Quick preview without zooming |
+| Optional: when zoomed in, select the region under the viewport center | Panning updates the explanation |
 
-**Marker styling** (`index.css`): idle markers use a faint dashed outline and a number badge. The
-selected or hovered marker gets a solid amber (`--warning`) border with a light fill. Badges are about
-1.5rem, dark text on amber, with a white ring. Check legibility in dark mode and with the large-text
-display setting.
+Keep `main`'s marker look: outline only, so the real image stays visible.
 
 ### 3.3 `Results.tsx`
 
-Replace `<ImageZoom … findings={…} />` with `<TeachableView src={previewUrl} alt={fileName}
-result={currentResult} />`. Let the preview column span the full card width when `TeachableView` shows
-the panel (e.g. `.result-preview:has(.teachable) { flex: 1 1 100%; max-width: none; }`).
+Wrap the existing `<ImageZoom>` and the new panel in a two-column container for the preview area. Keep
+`OnlineSearchPanel` and `ForensicsPanel` where they are. If there are no findings and no general cues,
+render exactly what `main` renders today.
 
 ## 4. General-explanation fallback UI (needed with backend §7)
 
 | Case | What to show |
 |---|---|
-| `findings` empty, `generalCues` present | Keep the two columns: plain zoomable image (no markers) on the left. On the right, the verdict block plus a **"What to look for in this image"** list. Each cue shows label, explanation, "What to check:" tip, and `appliesBecause` in a muted "Why this applies: …" line. |
+| `findings` empty, `generalCues` present | Plain zoomable image (no markers) plus a **"What to look for in this image"** list. Each cue shows label, explanation, "What to check:" tip, and `appliesBecause` in a muted "Why this applies: …" line. |
 | A few `findings` + `generalCues` | Region list and detail card as usual, then an **"Other things to check"** section with the general cues. |
+| `partial` result (detection failed) with cues | Show the cues under the existing partial-result message, so the user still learns what to check. |
 | `real` verdict with cues | A collapsible "What to check anyway" section, worded as guidance, not suspicion. |
-| Neither findings nor cues | The plain zoomable image, as today. |
+| No findings and no cues | Exactly what `main` shows today. |
 
 Honesty note for general cues: "These are common signs of AI-generated images that are worth checking
 here. They are not specific detections in this image."
 
+Some cues come from the forensics results (e.g. missing camera information). Consider linking such a
+cue to the matching section of `ForensicsPanel`, so the user can see the evidence.
+
 ## 5. Accessibility and responsiveness checklist
 
 - Markers and list items are real `<button>`s with `aria-label="Finding N: label"` and `aria-pressed`.
-- The tooltip uses `role="tooltip"` and is linked with `aria-describedby` while hovered.
 - Detail and explanation areas are `aria-live="polite"`.
-- Zoom controls sit in a `role="group"` with a label.
-- Respect `prefers-reduced-motion`.
-- Works in a single column below 860px; on touch, use tap plus the list (no hover).
-- Works with dark mode and large text (from the display settings).
+- Zoom changes respect `prefers-reduced-motion`.
+- Single column below 860px; on touch, rely on tap plus the list (no hover).
+- Check with dark mode and large text (display settings), using the theme tokens in
+  `frontend/src/styles/tokens.css`.
 
 ## 6. Acceptance tests (manual)
 
-Use the backend with `DETECTION_PROVIDER=stub` and `STUB_DEMO_VERDICT=fake`, `warn`, then empty:
+The backend needs `OPENROUTER_API_KEY`; there is no offline demo provider any more.
 
-1. A face photo set to `fake` shows 4 numbered regions; `warn` shows 3; `real` shows the plain viewer.
+1. An image that comes back with regions shows numbered markers, a matching list, and a detail card.
+   The tip and confidence appear when the model returned them.
 2. Clicking a list item or a marker zooms in on that region and updates the detail card.
-3. Hover shows a tooltip; panning doesn't select by accident; Clear selection resets to 100%.
-4. The heatmap toggle shows and hides the glows.
-5. The method line and honesty note change between stub ("mock") and OpenRouter results.
-6. After the backend fallback ships: an image with no findings shows "What to look for in this image"
+3. The method line shows `explanation_method`.
+4. After the backend fallback ships: an image with no regions shows "What to look for in this image",
    with reasons that match the image (for example, a screenshot without camera data shows the
    missing-camera-information cue).
-7. History entries don't include findings or cues.
-
-## 7. Reference prototype
-
-The original developer has an **uncommitted local prototype** of §2–§3 (`TeachableView.tsx`,
-`styles/teachable.css`, and the `ImageZoom` / `index.css` / plumbing changes). It isn't on this branch. Ask
-them for it if you want a starting point. It doesn't include the general-cues UI from §4.
+5. A partial result (detection failed) still shows the general cues.
+6. History entries don't include findings or cues.
+7. Online search and forensics panels behave as on `main`.

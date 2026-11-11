@@ -32,6 +32,10 @@
   --text-strong: #000;       /* Figma headings are pure black */
   --brand-ink: var(--primary); /* --primary used as a foreground colour */
   --muted-fill: #c3ccd8;     /* completed steps, scrollbar thumb */
+  --stage-bg: #eef2f7;       /* image stage behind upload previews */
+  --drop-border: #7f8c9e;    /* dashed drop target — 3:1 on --stage-bg (NFR-03) */
+  --accent-soft-bg: #e6f5f4; /* privacy box, completed progress steps */
+  --accent-ink: #0e6b67;     /* --accent as text; 5.6:1 on --accent-soft-bg */
 
   /* Result states — SDS §4.1.2.1 (FR-10 / BR-13) */
   --verdict-real-fg: #11704c;
@@ -71,7 +75,6 @@
 
   /* Type — 12/14/16/18/20/24/30 product-app scale; only --fs-3xl is fluid */
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-poppins: 'Poppins', var(--font-body);
   /* rem so the text-size setting (font-size on <html>) scales every token */
   --fs-xs: 0.75rem;
   --fs-sm: 0.875rem;
@@ -118,6 +121,10 @@
   --text-strong: #e6edf5;
   --brand-ink: #8fb4e0;
   --muted-fill: #3d4f66;
+  --stage-bg: #0b121b;       /* sits below the page so photos stand out */
+  --drop-border: #6b7c92;
+  --accent-soft-bg: #0f2a2c;
+  --accent-ink: #5fd6cf;
 
   --verdict-real-fg: #5fd3a1;
   --verdict-real-bg: #123326;

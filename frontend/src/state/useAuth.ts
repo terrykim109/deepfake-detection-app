@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { authApi, setTokenGetter, type UserResponse } from "../api/client";
-import { auth } from "../firebase";
+import { auth, storage } from "../firebase";
 import {
   clearLastActivity,
   useInactivityTimeout,
@@ -57,6 +60,12 @@ function firebaseAuthErrorMessage(err: unknown): string {
       return "Password must be at least 12 characters and include an uppercase letter, a lowercase letter, a number, and a special character.";
     case "auth/invalid-email":
       return "Please enter a valid email address.";
+    case "auth/missing-email":
+      return "Enter your email address to continue.";
+    case "storage/unauthorized":
+      return "You don't have permission to change this photo. Please log in again.";
+    case "storage/quota-exceeded":
+      return "Photo storage is full right now. Please try again later.";
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found":
@@ -64,6 +73,11 @@ function firebaseAuthErrorMessage(err: unknown): string {
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a moment and try again.";
     default:
+      // Any other Storage failure (offline, cancelled, no bucket) gets one
+      // plain message instead of Firebase's "Firebase Storage: ... (storage/x)"
+      if (code.startsWith("storage/")) {
+        return "Couldn't update your photo. Please try again.";
+      }
       return err instanceof Error
         ? err.message
         : "Something went wrong. Please try again.";
@@ -85,6 +99,8 @@ export interface AuthState {
   saving: boolean;
   error: string;
   sessionTimeoutMinutes: number;
+  /** Profile photo URL from Firebase Auth; null when the user has none. */
+  photoURL: string | null;
 }
 
 export interface AuthActions {
@@ -97,6 +113,9 @@ export interface AuthActions {
   signOut: (opts?: { reason?: "manual" | "inactivity" }) => Promise<void>;
   updateProfile: (next: Profile) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  updateAvatar: (image: Blob) => Promise<void>;
+  removeAvatar: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -144,6 +163,19 @@ export function useAuth(): AuthState & AuthActions {
   const [error, setError] = useState("");
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(
     DEFAULT_TIMEOUT_MINUTES,
+  );
+  // Keyed by uid: Firebase Auth keeps its own session, which can outlive
+  // our sessionStorage one, so only trust a photo that belongs to `user`.
+  const [photo, setPhoto] = useState<{ uid: string; url: string | null } | null>(
+    null,
+  );
+
+  useEffect(
+    () =>
+      onAuthStateChanged(auth, (fbUser) => {
+        setPhoto(fbUser ? { uid: fbUser.uid, url: fbUser.photoURL } : null);
+      }),
+    [],
   );
 
   useEffect(() => {
@@ -412,6 +444,62 @@ export function useAuth(): AuthState & AuthActions {
     }
   }, []);
 
+  const sendPasswordReset = useCallback(async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err) {
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? String((err as { code: unknown }).code)
+          : "";
+      // Same outcome as a real account so the page can't be used to probe
+      // which emails are registered.
+      if (code === "auth/user-not-found") return;
+      throw new Error(firebaseAuthErrorMessage(err));
+    }
+  }, []);
+
+  const signedInFirebaseUser = useCallback(() => {
+    const fbUser = auth.currentUser;
+    if (!fbUser || fbUser.uid !== user?.user_id) {
+      throw new Error("Please log in again to change your photo.");
+    }
+    return fbUser;
+  }, [user]);
+
+  const updateAvatar = useCallback(
+    async (image: Blob) => {
+      const fbUser = signedInFirebaseUser();
+      try {
+        const avatarRef = ref(storage, `avatars/${fbUser.uid}`);
+        await uploadBytes(avatarRef, image, { contentType: image.type });
+        const url = await getDownloadURL(avatarRef);
+        await updateFirebaseProfile(fbUser, { photoURL: url });
+        setPhoto({ uid: fbUser.uid, url });
+      } catch (err) {
+        throw new Error(firebaseAuthErrorMessage(err));
+      }
+    },
+    [signedInFirebaseUser],
+  );
+
+  const removeAvatar = useCallback(async () => {
+    const fbUser = signedInFirebaseUser();
+    // Unlink first: if the delete below fails we leave an unseen orphan file,
+    // not a profile pointing at a missing image.
+    try {
+      await updateFirebaseProfile(fbUser, { photoURL: null });
+      setPhoto({ uid: fbUser.uid, url: null });
+    } catch (err) {
+      throw new Error(firebaseAuthErrorMessage(err));
+    }
+    try {
+      await deleteObject(ref(storage, `avatars/${fbUser.uid}`));
+    } catch {
+      // Nothing links to the file any more, and the next upload overwrites it
+    }
+  }, [signedInFirebaseUser]);
+
   // Inactivity auto-logout
   useInactivityTimeout(
     Boolean(user && token),
@@ -429,11 +517,15 @@ export function useAuth(): AuthState & AuthActions {
     saving,
     error,
     sessionTimeoutMinutes,
+    photoURL: photo && photo.uid === user?.user_id ? photo.url : null,
     signUp,
     signIn,
     signOut,
     updateProfile,
     resendVerificationEmail,
+    sendPasswordReset,
+    updateAvatar,
+    removeAvatar,
     clearError,
   };
 }

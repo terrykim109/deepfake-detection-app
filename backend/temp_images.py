@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import shutil
 import threading
 from datetime import datetime, timedelta, timezone
@@ -29,8 +30,19 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 def _dir() -> Path:
     root = Path(TEMP_UPLOAD_DIR)
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        # Probe writability (Vercel package dirs are read-only).
+        probe = root / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return root
+    except OSError:
+        import tempfile
+
+        fallback = Path(tempfile.gettempdir()) / "dfd_tmp_uploads"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
 
 
 def _meta_path(image_id: str) -> Path:
@@ -55,6 +67,8 @@ def store_temp_image(
     delete_by = stored_at + timedelta(seconds=MAX_TEMP_IMAGE_SECONDS)
     path = _file_path(image_id, filename or "upload.bin")
 
+    access_token = secrets.token_urlsafe(32)
+
     with _lock:
         path.write_bytes(data)
         meta = {
@@ -64,6 +78,7 @@ def store_temp_image(
             "content_type": content_type or "application/octet-stream",
             "size": len(data),
             "path": str(path),
+            "access_token": access_token,
             "stored_at": stored_at.isoformat(),
             "delete_by": delete_by.isoformat(),
             "deleted_at": None,
@@ -86,6 +101,8 @@ def store_temp_image(
         "stored_at": meta["stored_at"],
         "delete_by": meta["delete_by"],
         "max_retention_seconds": MAX_TEMP_IMAGE_SECONDS,
+        # Returned only to the analysis pipeline — never to the browser client.
+        "access_token": access_token,
     }
 
 
@@ -97,6 +114,20 @@ def get_temp_meta(image_id: str) -> dict | None:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+
+
+def update_temp_meta(image_id: str, **updates: object) -> bool:
+    """Update non-sensitive metadata for an active temporary image."""
+    with _lock:
+        meta = get_temp_meta(image_id)
+        if not meta or meta.get("deleted_at"):
+            return False
+        meta.update(updates)
+        try:
+            _meta_path(image_id).write_text(json.dumps(meta), encoding="utf-8")
+        except OSError:
+            return False
+        return True
 
 
 def read_temp_bytes(image_id: str) -> bytes | None:

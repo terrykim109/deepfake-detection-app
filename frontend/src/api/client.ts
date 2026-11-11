@@ -1,6 +1,10 @@
-// Hit the FastAPI backend directly. CORS already allows Authorization.
-// (Same-origin Vite proxy was returning 404 when the backend wasn't reached.)
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+// Local: hit FastAPI on :8000.
+// Production (Vercel): use same-origin "" so /api/* is rewritten to the backend
+// service in vercel.json. Do NOT default production to localhost — the user's
+// browser cannot reach your machine.
+const API_BASE =
+  import.meta.env.VITE_API_BASE ??
+  (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
 interface ApiResponse<T> {
   data?: T
@@ -57,11 +61,12 @@ async function request<T>(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Network error'
     if (/failed to fetch|networkerror|load failed/i.test(message)) {
+      const target = API_BASE || window.location.origin
       return {
         error:
           'Cannot reach the API at ' +
-          (API_BASE || window.location.origin) +
-          '. Is the backend running on port 8000?',
+          target +
+          '. If this is production, ensure the Vercel backend service is deployed and /api rewrites are active.',
       }
     }
     return { error: message }
@@ -167,6 +172,28 @@ export interface AnalysisFindingPayload {
   h: number
 }
 
+export type OnlineMatchType = 'exact' | 'visual' | 'related'
+
+export interface OnlineSearchResultItem {
+  title: string
+  link: string
+  source: string
+  thumbnail: string | null
+  match_type: OnlineMatchType
+  position: number | null
+}
+
+export interface OnlineSearchPayload {
+  status: 'ok' | 'empty' | 'error'
+  total_count: number
+  exact_count: number
+  visual_count: number
+  related_count: number
+  results: OnlineSearchResultItem[]
+  error: string | null
+  disclaimer: string
+}
+
 export interface AnalysisRunResultPayload {
   id: string
   verdict: string
@@ -182,11 +209,51 @@ export interface AnalysisRunResultPayload {
 export interface AnalysisRunResponse {
   ok: boolean
   status: string
-  result?: AnalysisRunResultPayload
+  result?: AnalysisRunResultPayload | null
+  detection_error?: string | null
+  online_search?: OnlineSearchPayload
+  forensics?: ForensicsResult | null
   image?: TempImageInfo
   privacy?: AnalysisPrivacy
   usage?: AnalysisUsage
   provider?: string
+}
+
+export type AdminInterval = 'daily' | 'weekly' | 'monthly'
+
+export interface AdminUsageBucket {
+  period: string
+  totalAnalyses: number
+  successfulAnalyses: number
+  failedAnalyses: number
+}
+
+export interface AdminUsageResponse {
+  interval: AdminInterval
+  totals: Omit<AdminUsageBucket, 'period'>
+  buckets: AdminUsageBucket[]
+}
+
+export interface AdminUser {
+  userId: string
+  email: string
+  displayName: string | null
+  createdAt: string | null
+  isVerified: boolean
+  role: 'admin' | 'user'
+}
+
+export interface AdminUsersResponse {
+  totalUsers: number
+  verifiedUsers: number
+  unverifiedUsers: number
+  users: AdminUser[]
+}
+
+export const adminApi = {
+  usage: (interval: AdminInterval) =>
+    get<AdminUsageResponse>(`/api/admin/usage?interval=${interval}`),
+  users: () => get<AdminUsersResponse>('/api/admin/users'),
 }
 
 async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<ApiResponse<T>> {
