@@ -2,6 +2,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './state/AppState'
+import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { CreateAccount } from './pages/CreateAccount'
 import { VerifyEmail } from './pages/VerifyEmail'
@@ -27,6 +28,13 @@ const RedirectIfAuth: React.FC<{ children: React.ReactElement }> = ({ children }
   return user ? <Navigate to="/profile" replace /> : children
 }
 
+/* The landing page is only for visitors; signed-in users start on Analyze */
+const LandingOrApp: React.FC = () => {
+  const { user, loading } = useAppState()
+  if (loading) return <FullPageSpinner />
+  return user ? <Navigate to="/upload" replace /> : <Landing />
+}
+
 /* ─── Router ─── */
 const AppRoutes: React.FC = () => (
   <Routes>
@@ -41,8 +49,8 @@ const AppRoutes: React.FC = () => (
     <Route path="/result/:id" element={<RequireAuth><ResultDetail /></RequireAuth>} />
     {/* Design-system reference for the team — public, not linked in the nav */}
     <Route path="/styleguide" element={<StyleGuide />} />
-    <Route path="/" element={<Navigate to="/profile" replace />} />
-    <Route path="*" element={<Navigate to="/profile" replace />} />
+    <Route path="/" element={<LandingOrApp />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 )
 

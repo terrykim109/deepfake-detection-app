@@ -63,10 +63,6 @@
 .nav-tab[aria-current='page'] { color: #fff; border-bottom-color: var(--accent); }
 .nav-tab:focus-visible { border-radius: var(--radius-sm); }
 
-/* Landing variant: auth buttons at the right of the bar */
-.nav-auth { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); padding-block: var(--space-2); }
-
 @media (max-width: 767px) {
   .nav-tab { flex: 1; min-width: 0; }
-  .nav-auth { margin-inline: auto; }
 }
