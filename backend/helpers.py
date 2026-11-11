@@ -24,6 +24,7 @@ def user_from_doc(doc_id: str, data: dict | None = None) -> UserResponse:
         user_id=data.get("user_id") or doc_id,
         email=data.get("email") or "",
         display_name=data.get("display_name"),
+        username=data.get("username") or "",
         first_name=data.get("first_name") or "",
         last_name=data.get("last_name") or "",
         phone=data.get("phone") or data.get("phone_number") or data.get("phoneNumber") or "",

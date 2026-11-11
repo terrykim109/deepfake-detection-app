@@ -4,21 +4,12 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppState } from "../state/AppState";
 import { Alert, Button, TextField } from "../components/ui";
-
-const MIN_PASSWORD_LENGTH = 12;
-const PASSWORD_REQUIREMENTS_MESSAGE =
-  `Password must be at least ${MIN_PASSWORD_LENGTH} characters and include an uppercase letter, ` +
-  "a lowercase letter, a number, and a special character.";
-
-function meetsPasswordPolicy(password: string): boolean {
-  return (
-    password.length >= MIN_PASSWORD_LENGTH &&
-    /[A-Z]/.test(password) &&
-    /[a-z]/.test(password) &&
-    /[0-9]/.test(password) &&
-    /[^A-Za-z0-9]/.test(password)
-  );
-}
+import {
+  PASSWORD_REQUIREMENTS_MESSAGE,
+  USERNAME_RULE,
+  isValidUsername,
+  meetsPasswordPolicy,
+} from "../state/accountRules";
 
 export const CreateAccount: React.FC = () => {
   const navigate = useNavigate();
@@ -31,8 +22,8 @@ export const CreateAccount: React.FC = () => {
     clearError();
 
     const form = e.target as HTMLFormElement;
-    const name = (
-      form.elements.namedItem("name") as HTMLInputElement
+    const username = (
+      form.elements.namedItem("username") as HTMLInputElement
     ).value.trim();
     const email = (
       form.elements.namedItem("email") as HTMLInputElement
@@ -44,8 +35,8 @@ export const CreateAccount: React.FC = () => {
       form.elements.namedItem("confirmPassword") as HTMLInputElement
     ).value.trim();
 
-    if (!name) {
-      setLocalError("Please enter your name.");
+    if (!isValidUsername(username)) {
+      setLocalError(USERNAME_RULE);
       return;
     }
 
@@ -68,7 +59,7 @@ export const CreateAccount: React.FC = () => {
     }
 
     try {
-      await signUp(email, password, name);
+      await signUp(email, password, username);
       navigate("/verify-email", { state: { email } });
     } catch {
       // error surfaced via useAuth
@@ -88,11 +79,13 @@ export const CreateAccount: React.FC = () => {
 
         <form className="auth-form" onSubmit={submit}>
           <TextField
-            name="name"
-            label="Full Name"
+            name="username"
+            label="Username"
             hideLabel
-            placeholder="Full Name"
-            autoComplete="name"
+            placeholder="Username"
+            autoComplete="nickname"
+            autoCapitalize="none"
+            spellCheck={false}
             disabled={loading}
           />
 

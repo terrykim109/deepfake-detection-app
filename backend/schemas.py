@@ -16,10 +16,8 @@ class UserLogin(BaseModel):
 
 # Profile update schema
 class ProfileUpdate(BaseModel):
-    first_name: str = ""
-    last_name: str = ""
+    username: str = ""
     email: str = ""
-    phone: str = ""
 
 
 # Sync Firebase Auth user into Firestore profiles.
@@ -40,6 +38,7 @@ class UserResponse(BaseModel):
     user_id: str
     email: str
     display_name: str | None = None
+    username: str = ""
     first_name: str = ""
     last_name: str = ""
     phone: str = ""

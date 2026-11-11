@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { useAppState } from '../state/AppState'
-import { analysisApi } from '../api/client'
 import type { AnalysisStage } from '../detection/detector'
 import { validateUploadSelection } from '../upload/validateUpload'
 import {
@@ -79,7 +78,6 @@ export const Upload: React.FC = () => {
   const [processing, setProcessing] = useState(false)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState('')
-  const [quota, setQuota] = useState<{ left: number; max: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const previewRef = useRef<string | null>(null)
   const handedOff = useRef(false)
@@ -108,18 +106,6 @@ export const Upload: React.FC = () => {
       window.removeEventListener('drop', block)
     }
   }, [])
-
-  // Refreshed after each run so the count reflects the analysis just made (BR-06).
-  useEffect(() => {
-    if (!user?.user_id || busy) return
-    let cancelled = false
-    void analysisApi.usage(user.user_id).then((res) => {
-      if (!cancelled && res.data) setQuota({ left: res.data.remaining_24h, max: res.data.max_24h })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [user?.user_id, busy])
 
   useEffect(() => {
     if (!busy) return
@@ -411,12 +397,6 @@ export const Upload: React.FC = () => {
 
           <div className="upload-bar">
             <div className="upload-bar__info">
-              {!slow && quota && (
-                <p className="upload-quota">
-                  <ClockIcon aria-hidden="true" />
-                  {quota.left} of {quota.max} checks left today
-                </p>
-              )}
               {/* Always mounted so screen readers announce the text when it arrives. */}
               <p className="upload-slow" role="status">
                 {slow && (

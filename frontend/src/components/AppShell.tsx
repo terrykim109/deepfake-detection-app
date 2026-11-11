@@ -2,7 +2,6 @@ import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { IconButton } from './ui'
 import { SettingsMenu } from './SettingsMenu'
-import { useAppState } from '../state/AppState'
 
 export const Logo: React.FC<{ to?: string }> = ({ to = '/' }) => (
   <Link className="app-logo" to={to} aria-label="Deepfake Detection home">
@@ -16,7 +15,6 @@ const HISTORY_PATHS = ['/history', '/result/']
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { photoURL } = useAppState()
 
   const analyzeActive = ANALYZE_PATHS.some((p) => pathname.startsWith(p))
   const historyActive = HISTORY_PATHS.some((p) => pathname.startsWith(p))
@@ -29,7 +27,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <SettingsMenu />
           <IconButton
             className="app-account"
-            icon={photoURL ? <img src={photoURL} alt="" className="app-account__photo" /> : '/assets/account-circle.svg'}
+            icon="/assets/account-circle.svg"
             label="Account"
             onClick={() => navigate('/profile')}
             aria-current={pathname.startsWith('/profile') ? 'page' : undefined}

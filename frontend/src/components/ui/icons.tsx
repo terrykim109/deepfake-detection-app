@@ -144,10 +144,10 @@ export const GearIcon: React.FC<IconProps> = (p) => (
   </svg>
 )
 
-export const CameraIcon: React.FC<IconProps> = (p) => (
+export const LockIcon: React.FC<IconProps> = (p) => (
   <svg {...base} {...p}>
-    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-    <circle cx="12" cy="13" r="3" />
+    <rect x="4" y="11" width="16" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
   </svg>
 )
 
