@@ -36,6 +36,8 @@ TEMP_UPLOAD_DIR = str(Path(__file__).resolve().parent / "tmp_uploads")
 
 # Detection: "openrouter" (ensemble) or "stub" (local heuristic)
 DETECTION_PROVIDER = os.getenv("DETECTION_PROVIDER", "openrouter")
+# Stub only: force "fake" / "warn" / "real" for demos instead of the hash-based verdict
+STUB_DEMO_VERDICT = os.getenv("STUB_DEMO_VERDICT", "").strip().lower()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODELS = [
     "nvidia/nemotron-3.5-super-vl:free",

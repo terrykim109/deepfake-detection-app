@@ -19,7 +19,7 @@ _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _TIMEOUT_SECONDS = 45.0
 _MAX_TOKENS = 600
 _TEMPERATURE = 0.2
-_MAX_FINDINGS = 3
+_MAX_FINDINGS = 4
 
 # Added: differences this large between model scores trigger an inconclusive result
 _DISAGREEMENT_THRESHOLD = 30
@@ -29,15 +29,16 @@ _PROMPT = """You are an image forensics assistant helping detect AI-generated or
 Analyze the image for deepfake / AI-generation / heavy editing cues (unnatural textures, inconsistent lighting, warped anatomy, compression artifacts, etc.).
 
 Respond with ONLY valid JSON (no markdown, no extra text):
-{"verdict":"real"|"warn"|"fake","confidence":0-100,"summary":"one short sentence","findings":[{"label":"short title","explanation":"one tentative sentence","x":0.0,"y":0.0,"w":0.0,"h":0.0}]}
+{"verdict":"real"|"warn"|"fake","confidence":0-100,"summary":"one short sentence","findings":[{"label":"short title","explanation":"one tentative sentence","tip":"what the user should check when zoomed in","confidence":0-100,"x":0.0,"y":0.0,"w":0.0,"h":0.0}]}
 
 Rules:
 - confidence is manipulation likelihood: 0 = clearly authentic, 100 = clearly fake/AI-generated.
 - verdict "fake" for strong manipulation signals, "warn" for inconclusive/mixed, "real" for little evidence of manipulation.
 - summary must be one plain-English sentence suitable for end users.
-- findings: up to 3 suspicious regions. Use empty [] when verdict is "real".
+- findings: up to 4 suspicious regions. Use empty [] when verdict is "real".
 - x,y,w,h are normalized 0–1 relative to the full image (x,y = top-left of the region).
 - explanations must be tentative cues (not definitive proof), e.g. "this area looks inconsistent because…".
+- each finding's confidence is how suspicious that region is, 0–100.
 """
 
 _VERDICT_LABELS = {
@@ -115,6 +116,45 @@ def _extract_json(text: str) -> dict:
         return json.loads(match.group(0))
 
 
+_COORD_KEYS = ("x", "y", "w", "h")
+
+
+def _coord(item: dict, key: str, scale: float) -> float:
+    """Read one box coordinate, convert to 0–1, and clamp. Raises on bad input."""
+    return _clamp01(float(item.get(key)) / scale)
+
+
+def _coord_scale(items: list) -> float:
+    """
+    Some vision models answer in 0–1000 despite the prompt. If any coordinate
+    in the response is above 1, treat the whole response as 0–1000 so every
+    box from that model is scaled the same way.
+    """
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        for key in _COORD_KEYS:
+            try:
+                if float(item.get(key)) > 1:
+                    return 1000.0
+            except (TypeError, ValueError):
+                continue
+    return 1.0
+
+
+def _region_confidence(value: Any) -> int | None:
+    """Per-region score as 0–100; accepts a 0–1 probability too."""
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not 0 <= number <= 100:
+        return None
+    return int(round(number * 100 if number <= 1 else number))
+
+
 def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
     if verdict == "real":
         return []
@@ -122,6 +162,7 @@ def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
 
+    scale = _coord_scale(raw)
     findings: list[dict[str, Any]] = []
 
     for index, item in enumerate(raw):
@@ -138,10 +179,7 @@ def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
             continue
 
         try:
-            x = _clamp01(float(item.get("x")))
-            y = _clamp01(float(item.get("y")))
-            w = _clamp01(float(item.get("w")))
-            h = _clamp01(float(item.get("h")))
+            x, y, w, h = (_coord(item, key, scale) for key in _COORD_KEYS)
         except (TypeError, ValueError):
             continue
 
@@ -152,17 +190,25 @@ def _parse_findings(raw: Any, *, verdict: str) -> list[dict[str, Any]]:
         if w <= 0 or h <= 0:
             continue
 
-        findings.append(
-            {
-                "id": f"f{index + 1}",
-                "label": label[:80],
-                "explanation": explanation[:280],
-                "x": round(x, 4),
-                "y": round(y, 4),
-                "w": round(w, 4),
-                "h": round(h, 4),
-            }
-        )
+        finding: dict[str, Any] = {
+            "id": f"f{index + 1}",
+            "label": label[:80],
+            "explanation": explanation[:280],
+            "x": round(x, 4),
+            "y": round(y, 4),
+            "w": round(w, 4),
+            "h": round(h, 4),
+        }
+
+        # Optional extras; dropped rather than failing the finding when malformed
+        tip = str(item.get("tip") or "").strip()
+        if tip:
+            finding["tip"] = tip[:200]
+        region_confidence = _region_confidence(item.get("confidence"))
+        if region_confidence is not None:
+            finding["confidence"] = region_confidence
+
+        findings.append(finding)
 
     return findings
 
@@ -400,6 +446,7 @@ def _combine(scores: list[_ModelScore]) -> DetectionResult:
         summary=summary or _FALLBACK_SUMMARIES[verdict],
         provider="openrouter",
         findings=findings,
+        explanation_method="AI vision model description (approximate areas)" if findings else "",
     )
 
 

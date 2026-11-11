@@ -14,6 +14,8 @@ class DetectionResult:
     summary: str
     provider: str
     findings: list[dict[str, Any]] = field(default_factory=list)
+    # How findings were produced, shown to the user (e.g. "mock regions ...")
+    explanation_method: str = ""
 
 
 class Detector(Protocol):

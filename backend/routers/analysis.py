@@ -169,6 +169,7 @@ async def run_analysis(
             "created_at": now_iso(),
             "provider": detection.provider,
             "findings": getattr(detection, "findings", None) or [],
+            "explanation_method": getattr(detection, "explanation_method", "") or "",
         },
         "image": deletion,
         "privacy": {
