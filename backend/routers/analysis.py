@@ -88,8 +88,8 @@ async def run_analysis(
     DFD-02 end-to-end: validate → temp store → detect + reverse search + forensics
     in parallel → delete.
 
-    Deepfake detection, Scrappa online search, and the forensics feature all run independently. If one fails, 
-    it does not block the other processes. The temporary image is deleted once all three parts finish. 
+    Deepfake detection, Scrappa online search, and the forensics feature all run independently. If one fails,
+    it does not block the other processes. The temporary image is deleted once all three parts finish.
     """
     uid = user["uid"]
     data = await file.read()

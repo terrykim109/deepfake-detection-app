@@ -7,6 +7,7 @@ import { ImageZoom } from '../components/ImageZoom'
 import { OnlineSearchPanel } from '../components/OnlineSearchPanel'
 import { ForensicsPanel } from '../components/ForensicsPanel'
 import { useAppState } from '../state/AppState'
+import { LevelSummary } from '../summary/LevelSummary'
 import { Alert, Button, Card, CheckCircleIcon, PageHeader, ScoreDial, TrashCheckIcon, VerdictBadge } from '../components/ui'
 import '../styles/forensicsTest.css'
 
@@ -93,7 +94,9 @@ export const Results: React.FC = () => {
           </div>
         </div>
 
+        <LevelSummary key={`${currentResult.id}:${previewUrl ?? 'no-preview'}`} result={currentResult} previewUrl={previewUrl} />
         <OnlineSearchPanel data={currentResult.onlineSearch} />
+
 
         <Alert tone="success" icon={<TrashCheckIcon className="ui-alert__icon" />} className="privacy-note">
           {privacyText}

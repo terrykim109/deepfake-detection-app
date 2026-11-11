@@ -9,10 +9,10 @@ def get_detector() -> Detector:
 
     if provider_name in {"openrouter", "or", "ensemble"}:
          from detection.openrouter import OpenRouterEnsembleDetector
-         
+
          return OpenRouterEnsembleDetector()
 
-    raise ValueError(f"Unsupported DETECTION_PROVIDER: {provider_name!r}. " 
+    raise ValueError(f"Unsupported DETECTION_PROVIDER: {provider_name!r}. "
                      "Expected 'openrouter', 'or', or 'ensemble'.")
 
 __all__ = [ "Detector", "DetectionError", "DetectionResult", "get_detector" ]
