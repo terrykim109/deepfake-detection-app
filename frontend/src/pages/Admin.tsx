@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { AppShell } from '../components/AppShell'
 import {
   adminApi,
+  type AdminAnalysis,
   type AdminInterval,
   type AdminUsageResponse,
   type AdminUsersResponse,
@@ -13,6 +14,9 @@ const INTERVAL_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ]
+
+type AnalysisFilter = 'all' | 'successful' | 'failed'
+type UserFilter = 'all' | 'verified' | 'unverified'
 
 function formatDate(value: string | null): string {
   if (!value) return '—'
@@ -92,10 +96,16 @@ export const Admin: React.FC = () => {
   const [interval, setInterval] = useState<AdminInterval>('daily')
   const [usage, setUsage] = useState<AdminUsageResponse | null>(null)
   const [users, setUsers] = useState<AdminUsersResponse | null>(null)
+  const [analyses, setAnalyses] = useState<AdminAnalysis[]>([])
+  const [analysisFilter, setAnalysisFilter] = useState<AnalysisFilter>('all')
+  const [analysisView, setAnalysisView] = useState<'chart' | 'list'>('chart')
+  const [userFilter, setUserFilter] = useState<UserFilter>('all')
   const [usageError, setUsageError] = useState('')
   const [usersError, setUsersError] = useState('')
+  const [analysesError, setAnalysesError] = useState('')
   const [loadingUsage, setLoadingUsage] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
+  const [loadingAnalyses, setLoadingAnalyses] = useState(true)
 
   useEffect(() => {
     let active = true
@@ -118,6 +128,22 @@ export const Admin: React.FC = () => {
 
   useEffect(() => {
     let active = true
+    void adminApi.analyses().then((response) => {
+      if (!active) return
+      if (response.error || !response.data) {
+        setAnalysesError(response.error || 'Could not load analyses.')
+      } else {
+        setAnalyses(response.data.analyses)
+      }
+      setLoadingAnalyses(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
     setLoadingUsers(true)
     setUsersError('')
     void adminApi.users().then((response) => {
@@ -134,6 +160,17 @@ export const Admin: React.FC = () => {
       active = false
     }
   }, [])
+
+  const visibleAnalyses = analyses.filter((analysis) => {
+    if (analysisFilter === 'successful') return ['success', 'completed'].includes(analysis.status)
+    if (analysisFilter === 'failed') return !['success', 'completed'].includes(analysis.status)
+    return true
+  })
+  const visibleUsers = users?.users.filter((account) => {
+    if (userFilter === 'verified') return account.isVerified
+    if (userFilter === 'unverified') return !account.isVerified
+    return true
+  }) ?? []
 
   return (
     <AppShell>
@@ -161,22 +198,61 @@ export const Admin: React.FC = () => {
           ) : usage ? (
             <>
               <div className="admin-stats">
-                <Card className="admin-stat" padding="md">
+                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('all'); setAnalysisView('list') }}>
+                  <Card className="admin-stat" padding="md" interactive={analysisView === 'list' && analysisFilter === 'all'}>
                   <p className="admin-stat__label">Total analyses</p>
                   <p className="admin-stat__value">{usage.totals.totalAnalyses}</p>
-                </Card>
-                <Card className="admin-stat" padding="md">
+                  </Card>
+                </button>
+                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('successful'); setAnalysisView('list') }}>
+                  <Card className="admin-stat" padding="md" interactive={analysisFilter === 'successful'}>
                   <p className="admin-stat__label">Successful</p>
                   <p className="admin-stat__value">{usage.totals.successfulAnalyses}</p>
-                </Card>
-                <Card className="admin-stat" padding="md">
+                  </Card>
+                </button>
+                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('failed'); setAnalysisView('list') }}>
+                  <Card className="admin-stat" padding="md" interactive={analysisFilter === 'failed'}>
                   <p className="admin-stat__label">Failed</p>
                   <p className="admin-stat__value">{usage.totals.failedAnalyses}</p>
-                </Card>
+                  </Card>
+                </button>
               </div>
               <Card className="admin-chart-card" padding="md">
-                <h3 className="admin-subtitle">Analysis activity ({usage.interval})</h3>
-                <UsageChart usage={usage} />
+                {analysisView === 'chart' ? (
+                  <>
+                    <h3 className="admin-subtitle">Analysis activity ({usage.interval})</h3>
+                    <UsageChart usage={usage} />
+                  </>
+                ) : (
+                  <>
+                    <div className="admin-panel-heading">
+                      <h3 className="admin-subtitle">
+                        {analysisFilter === 'all' ? 'All analyses' : analysisFilter === 'successful' ? 'Successful analyses' : 'Failed analyses'}
+                      </h3>
+                      <button className="admin-view-chart-button" type="button" onClick={() => setAnalysisView('chart')}>
+                        Back to chart
+                      </button>
+                    </div>
+                    {analysesError ? <Alert tone="error">{analysesError}</Alert> : null}
+                    {loadingAnalyses ? <div className="admin-inline-loading"><Spinner /><span>Loading analyses…</span></div> : visibleAnalyses.length === 0 ? (
+                      <EmptyState icon="/assets/icon-file.svg" message="No matching analyses found." />
+                    ) : (
+                      <div className="admin-table-wrap">
+                        <table className="admin-table">
+                          <thead><tr><th>Analysis</th><th>Status</th><th>Completed</th><th>Confidence</th></tr></thead>
+                          <tbody>{visibleAnalyses.map((analysis) => (
+                            <tr key={analysis.requestId}>
+                              <td>{analysis.requestId}</td>
+                              <td>{analysis.status || 'Unknown'}</td>
+                              <td>{formatDate(analysis.completedAt || analysis.createdAt)}</td>
+                              <td>{analysis.confidence == null ? '—' : `${analysis.confidence}%`}</td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
               </Card>
             </>
           ) : null}
@@ -190,21 +266,27 @@ export const Admin: React.FC = () => {
           ) : users ? (
             <>
               <div className="admin-stats">
-                <Card className="admin-stat" padding="md">
+                <button className="admin-stat-button" type="button" onClick={() => setUserFilter('all')}>
+                  <Card className="admin-stat" padding="md" interactive={userFilter === 'all'}>
                   <p className="admin-stat__label">Registered users</p>
                   <p className="admin-stat__value">{users.totalUsers}</p>
-                </Card>
-                <Card className="admin-stat" padding="md">
+                  </Card>
+                </button>
+                <button className="admin-stat-button" type="button" onClick={() => setUserFilter('verified')}>
+                  <Card className="admin-stat" padding="md" interactive={userFilter === 'verified'}>
                   <p className="admin-stat__label">Verified</p>
                   <p className="admin-stat__value">{users.verifiedUsers}</p>
-                </Card>
-                <Card className="admin-stat" padding="md">
+                  </Card>
+                </button>
+                <button className="admin-stat-button" type="button" onClick={() => setUserFilter('unverified')}>
+                  <Card className="admin-stat" padding="md" interactive={userFilter === 'unverified'}>
                   <p className="admin-stat__label">Unverified</p>
                   <p className="admin-stat__value">{users.unverifiedUsers}</p>
-                </Card>
+                  </Card>
+                </button>
               </div>
-              {users.users.length === 0 ? (
-                <EmptyState icon="/assets/icon-file.svg" message="No registered users found." />
+              {visibleUsers.length === 0 ? (
+                <EmptyState icon="/assets/icon-file.svg" message="No matching users found." />
               ) : (
                 <Card className="admin-table-card" padding="md">
                   <div className="admin-table-wrap">
@@ -213,7 +295,7 @@ export const Admin: React.FC = () => {
                         <tr><th>Email</th><th>Registration date</th><th>Verification</th><th>Role</th></tr>
                       </thead>
                       <tbody>
-                        {users.users.map((account) => (
+                        {visibleUsers.map((account) => (
                           <tr key={account.userId}>
                             <td>{account.email || '—'}</td>
                             <td>{formatDate(account.createdAt)}</td>
