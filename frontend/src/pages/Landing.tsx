@@ -59,7 +59,7 @@ export const Landing: React.FC = () => (
 
     <footer className="landing-footer">
       <p>A screening tool, not forensic proof.</p>
-      <p>Banner image generated with AI · © 2026 Deepfake Detection</p>
+      <p>© 2026 Deepfake Detection</p>
     </footer>
   </div>
 )
