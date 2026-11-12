@@ -1,0 +1,82 @@
+.forensics-magnifier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.forensics-magnifier__viewport {
+  position: relative;
+  width: 100%;
+  height: min(70vh, 520px);
+  background: var(--placeholder);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.forensics-magnifier__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.forensics-magnifier__lens {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--secondary);
+  background: rgba(47, 111, 237, 0.12);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+.forensics-magnifier__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.forensics-magnifier__readout {
+  min-height: 7rem;
+}
+
+.forensics-magnifier__hint {
+  opacity: 0.7;
+}
+
+.forensics-magnifier__explain {
+  margin-top: var(--space-3);
+  opacity: 0.85;
+}
+
+.learn-kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+
+.learn-kv dt {
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.learn-kv dd {
+  margin: 0;
+}
+
+.learn-global-panel {
+  margin-top: var(--space-5);
+}
+
+.learn-global-panel h4 {
+  margin-bottom: var(--space-2);
+}
+
+.learn-global-panel__note {
+  opacity: 0.7;
+  margin-top: 0;
+}
