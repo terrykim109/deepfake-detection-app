@@ -4,7 +4,7 @@ import { ImageIcon, ShieldCheckIcon, ShieldIcon } from '../components/ui'
 
 const STEPS = [
   { Icon: ImageIcon, label: 'Upload a photo' },
-  { Icon: ShieldCheckIcon, label: 'Get a clear verdict' },
+  { Icon: ShieldCheckIcon, label: 'Scan for signs of AI or manipulation' },
   { Icon: ShieldIcon, label: 'Photos are never saved' },
 ]
 
@@ -40,8 +40,7 @@ export const Landing: React.FC = () => (
 
       <section className="landing-explainer" aria-label="How it works">
         <p className="landing-lead">
-          Edited and AI-made photos are easy to miss. Upload one and get a clear verdict, a confidence
-          score and a plain-language reason why.
+          Edited and AI-made photos are easy to miss. Upload one to get an assessment of potential AI or manipulation, a confidence score, and a plain-language explanation.
         </p>
         <ul className="landing-steps">
           {STEPS.map(({ Icon, label }) => (
