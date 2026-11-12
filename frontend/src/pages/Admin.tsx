@@ -14,7 +14,6 @@ const INTERVAL_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ]
-
 type AnalysisFilter = 'all' | 'successful' | 'failed'
 type UserFilter = 'all' | 'verified' | 'unverified'
 
@@ -171,6 +170,9 @@ export const Admin: React.FC = () => {
     if (userFilter === 'unverified') return !account.isVerified
     return true
   }) ?? []
+  const latestBucket = usage?.buckets.length
+    ? usage.buckets[usage.buckets.length - 1]
+    : null
 
   return (
     <AppShell>
@@ -201,19 +203,19 @@ export const Admin: React.FC = () => {
                 <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('all'); setAnalysisView('list') }}>
                   <Card className="admin-stat" padding="md" interactive={analysisView === 'list' && analysisFilter === 'all'}>
                   <p className="admin-stat__label">Total analyses</p>
-                  <p className="admin-stat__value">{usage.totals.totalAnalyses}</p>
+                  <p className="admin-stat__value">{latestBucket?.totalAnalyses ?? 0}</p>
                   </Card>
                 </button>
                 <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('successful'); setAnalysisView('list') }}>
                   <Card className="admin-stat" padding="md" interactive={analysisFilter === 'successful'}>
                   <p className="admin-stat__label">Successful</p>
-                  <p className="admin-stat__value">{usage.totals.successfulAnalyses}</p>
+                  <p className="admin-stat__value">{latestBucket?.successfulAnalyses ?? 0}</p>
                   </Card>
                 </button>
                 <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('failed'); setAnalysisView('list') }}>
                   <Card className="admin-stat" padding="md" interactive={analysisFilter === 'failed'}>
                   <p className="admin-stat__label">Failed</p>
-                  <p className="admin-stat__value">{usage.totals.failedAnalyses}</p>
+                  <p className="admin-stat__value">{latestBucket?.failedAnalyses ?? 0}</p>
                   </Card>
                 </button>
               </div>
