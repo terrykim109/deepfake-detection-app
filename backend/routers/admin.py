@@ -14,7 +14,12 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 def _documents(collection: Any) -> list[dict[str, Any]]:
-    return [doc.to_dict() or {} for doc in collection.stream()]
+    documents = []
+    for doc in collection.stream():
+        data = doc.to_dict() or {}
+        data.setdefault("requestId", doc.id)
+        documents.append(data)
+    return documents
 
 
 @router.get("/usage")
@@ -36,6 +41,32 @@ async def admin_usage(
         _documents(analysis_requests_ref),
         interval=interval,
     )
+
+
+@router.get("/analyses")
+async def admin_analyses(user: dict = Depends(require_admin)):
+    del user
+    analyses = []
+    for record in _documents(analysis_requests_ref):
+        request_id = record.get("requestId")
+        if not request_id:
+            continue
+        analyses.append(
+            {
+                "requestId": request_id,
+                "userId": record.get("userId", ""),
+                "status": str(record.get("status", "")).lower(),
+                "createdAt": record.get("createdAt"),
+                "completedAt": record.get("completedAt"),
+                "confidence": record.get("confidence"),
+                "error": record.get("error"),
+            }
+        )
+    analyses.sort(
+        key=lambda item: item["completedAt"] or item["createdAt"] or "",
+        reverse=True,
+    )
+    return {"analyses": analyses}
 
 
 @router.get("/users")

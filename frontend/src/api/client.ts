@@ -234,6 +234,20 @@ export interface AdminUsageResponse {
   buckets: AdminUsageBucket[]
 }
 
+export interface AdminAnalysis {
+  requestId: string
+  userId: string
+  status: string
+  createdAt: string | null
+  completedAt: string | null
+  confidence: number | null
+  error: string | null
+}
+
+export interface AdminAnalysesResponse {
+  analyses: AdminAnalysis[]
+}
+
 export interface AdminUser {
   userId: string
   email: string
@@ -253,6 +267,7 @@ export interface AdminUsersResponse {
 export const adminApi = {
   usage: (interval: AdminInterval) =>
     get<AdminUsageResponse>(`/api/admin/usage?interval=${interval}`),
+  analyses: () => get<AdminAnalysesResponse>('/api/admin/analyses'),
   users: () => get<AdminUsersResponse>('/api/admin/users'),
 }
 

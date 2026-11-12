@@ -94,3 +94,16 @@ def test_admin_usage_rejects_invalid_interval():
     finally:
         app.dependency_overrides.clear()
     assert response.status_code == 400
+
+
+def test_admin_analyses_returns_metadata_records():
+    app.dependency_overrides[require_admin] = lambda: {
+        "uid": "admin",
+        "claims": {"admin": True},
+    }
+    try:
+        response = client.get("/api/admin/analyses")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["analyses"][0]["requestId"] == "a1"
