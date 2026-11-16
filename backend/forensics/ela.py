@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageChops
 
+from .local_outliers import draw_outlier_outlines, local_outlier_mask
+
 BLOCK_SIZE = 16
 
 
@@ -50,8 +52,21 @@ def generate_ela(image_bytes: bytes, quality: int = 90) -> dict[str, Any]:
         max_error = float(diff_array.max()) if diff_array.size else 0.0
         mean_error = float(diff_array.mean()) if diff_array.size else 0.0
 
+        if diff_array.size:
+            block_mean = _block_grid(diff_array)
+            outlier_mask = local_outlier_mask(block_mean)
+            outlier_count = int(outlier_mask.sum())
+            total_block_count = int(block_mean.size)
+        else:
+            outlier_mask = None
+            outlier_count = 0
+            total_block_count = 0
+
         scale = 255.0 / max_error if max_error > 0 else 1.0
         amplified = np.clip(diff_array * scale, 0, 255).astype(np.uint8)
+        if outlier_mask is not None:
+            # amplified is RGB (from a PIL diff image), so red is (255, 0, 0) here.
+            draw_outlier_outlines(amplified, outlier_mask, BLOCK_SIZE, color=(255, 0, 0))
         ela_image = Image.fromarray(amplified)
 
         output_buffer = io.BytesIO()
@@ -64,6 +79,9 @@ def generate_ela(image_bytes: bytes, quality: int = 90) -> dict[str, Any]:
             "mean_error": mean_error,
             "max_error": max_error,
             "jpeg_quality": quality,
+            "outlier_block_count": outlier_count,
+            "total_block_count": total_block_count,
+            "block_size": BLOCK_SIZE,
         }
     except Exception as exc:
         return {"available": False, "error": str(exc)}

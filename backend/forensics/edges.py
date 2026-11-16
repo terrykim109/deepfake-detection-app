@@ -6,6 +6,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from .local_outliers import draw_outlier_outlines, local_outlier_mask
+
 BLOCK_SIZE = 16
 
 
@@ -49,9 +51,13 @@ def detect_edges(image_bytes: bytes) -> dict[str, Any]:
         mean_density = float(block_density.mean())
         std_density = float(block_density.std())
         max_density = float(block_density.max())
+        outlier_mask = local_outlier_mask(block_density)
+        outlier_count = int(outlier_mask.sum())
+        total_block_count = int(block_density.size)
 
         normalized = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
         heatmap = cv2.applyColorMap(normalized.astype(np.uint8), cv2.COLORMAP_JET)
+        draw_outlier_outlines(heatmap, outlier_mask, BLOCK_SIZE)
 
         success, encoded_png = cv2.imencode(".png", heatmap)
         if not success:
@@ -64,6 +70,8 @@ def detect_edges(image_bytes: bytes) -> dict[str, Any]:
             "mean_edge_density": mean_density,
             "std_edge_density": std_density,
             "max_edge_density": max_density,
+            "outlier_block_count": outlier_count,
+            "total_block_count": total_block_count,
             "block_size": BLOCK_SIZE,
         }
     except Exception as exc:

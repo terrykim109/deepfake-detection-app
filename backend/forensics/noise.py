@@ -6,8 +6,9 @@ from typing import Any
 import cv2
 import numpy as np
 
+from .local_outliers import draw_outlier_outlines, local_outlier_mask
+
 BLOCK_SIZE = 16
-OUTLIER_THRESHOLD_STD = 2.0
 
 
 def _block_grid(high_pass: np.ndarray) -> np.ndarray:
@@ -51,13 +52,14 @@ def analyze_noise(image_bytes: bytes) -> dict[str, Any]:
 
         mean_variance = float(block_variance.mean())
         std_variance = float(block_variance.std())
-        outlier_count = int(
-            np.sum(np.abs(block_variance - mean_variance) > OUTLIER_THRESHOLD_STD * std_variance)
-        ) if std_variance > 0 else 0
+        outlier_mask = local_outlier_mask(block_variance)
+        outlier_count = int(outlier_mask.sum())
+        total_block_count = int(block_variance.size)
 
         normalized = cv2.normalize(block_variance, None, 0, 255, cv2.NORM_MINMAX)
         heatmap_small = cv2.applyColorMap(normalized.astype(np.uint8), cv2.COLORMAP_JET)
         heatmap = cv2.resize(heatmap_small, (width, height), interpolation=cv2.INTER_NEAREST)
+        draw_outlier_outlines(heatmap, outlier_mask, BLOCK_SIZE)
 
         success, encoded_png = cv2.imencode(".png", heatmap)
         if not success:
@@ -70,6 +72,7 @@ def analyze_noise(image_bytes: bytes) -> dict[str, Any]:
             "mean_block_variance": mean_variance,
             "std_block_variance": std_variance,
             "outlier_block_count": outlier_count,
+            "total_block_count": total_block_count,
             "block_size": BLOCK_SIZE,
         }
     except Exception as exc:
