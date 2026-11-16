@@ -2,6 +2,12 @@ import React from "react";
 import { Alert, Card } from "./ui";
 import type { ForensicsResult } from "../api/client";
 
+function formatOutliers(count?: number, total?: number): string {
+  if (count === undefined) return "—";
+  if (!total) return String(count);
+  return `${count} / ${total} (${((100 * count) / total).toFixed(1)}%)`;
+}
+
 /* Renders the independent Digital Image Forensics result (metadata/EXIF,
    ELA, noise, C2PA) on the Results page. */
 export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
@@ -59,6 +65,13 @@ export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
         )}
       </Card>
 
+      <p className="forensics-hint">
+        Red outlines mark blocks that differ a lot from their immediate
+        neighbors (a.k.a., "a local outlier") in each heatmap below. This flags
+        local inconsistencies that may be worth a closer look. However, it
+        isn&apos;t proof of a manipulated/edited image.
+      </p>
+
       <Card padding="lg" className="forensics-section">
         <h3>Error Level Analysis (ELA)</h3>
         {ela.available ? (
@@ -75,6 +88,10 @@ export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
               <dd>{ela.max_error?.toFixed(2)}</dd>
               <dt>JPEG quality used</dt>
               <dd>{ela.jpeg_quality}</dd>
+              <dt>Outlier blocks</dt>
+              <dd>
+                {formatOutliers(ela.outlier_block_count, ela.total_block_count)}
+              </dd>
             </dl>
           </div>
         ) : (
@@ -99,7 +116,12 @@ export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
               <dt>Std block variance</dt>
               <dd>{noise.std_block_variance?.toFixed(2)}</dd>
               <dt>Outlier blocks</dt>
-              <dd>{noise.outlier_block_count}</dd>
+              <dd>
+                {formatOutliers(
+                  noise.outlier_block_count,
+                  noise.total_block_count,
+                )}
+              </dd>
             </dl>
           </div>
         ) : (
@@ -125,6 +147,13 @@ export const ForensicsPanel: React.FC<{ forensics: ForensicsResult }> = ({
               <dd>{edges.std_edge_density?.toFixed(2)}</dd>
               <dt>Max edge density</dt>
               <dd>{edges.max_edge_density?.toFixed(2)}</dd>
+              <dt>Outlier blocks</dt>
+              <dd>
+                {formatOutliers(
+                  edges.outlier_block_count,
+                  edges.total_block_count,
+                )}
+              </dd>
             </dl>
           </div>
         ) : (
