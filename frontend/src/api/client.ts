@@ -321,6 +321,9 @@ export interface ForensicsElaResult {
   mean_error?: number
   max_error?: number
   jpeg_quality?: number
+  outlier_block_count?: number
+  total_block_count?: number
+  block_size?: number
   error?: string
 }
 
@@ -330,6 +333,7 @@ export interface ForensicsNoiseResult {
   mean_block_variance?: number
   std_block_variance?: number
   outlier_block_count?: number
+  total_block_count?: number
   block_size?: number
   error?: string
 }
@@ -340,6 +344,8 @@ export interface ForensicsEdgesResult {
   mean_edge_density?: number
   std_edge_density?: number
   max_edge_density?: number
+  outlier_block_count?: number
+  total_block_count?: number
   block_size?: number
   error?: string
 }
