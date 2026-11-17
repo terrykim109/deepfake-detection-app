@@ -107,3 +107,28 @@ def test_admin_analyses_returns_metadata_records():
         app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["analyses"][0]["requestId"] == "a1"
+
+
+def test_admin_analysis_detail_returns_record():
+    app.dependency_overrides[require_admin] = lambda: {
+        "uid": "admin",
+        "claims": {"admin": True},
+    }
+    try:
+        response = client.get("/api/admin/analyses/a1")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["requestId"] == "a1"
+
+
+def test_admin_analysis_detail_returns_404_for_unknown_id():
+    app.dependency_overrides[require_admin] = lambda: {
+        "uid": "admin",
+        "claims": {"admin": True},
+    }
+    try:
+        response = client.get("/api/admin/analyses/missing")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 404

@@ -243,10 +243,18 @@ export interface AdminAnalysis {
   completedAt: string | null
   confidence: number | null
   error: string | null
+  startedAt: string | null
+  provider: string | null
+  reverseSearchStatus: string | null
+  forensicsStatus: string | null
 }
 
 export interface AdminAnalysesResponse {
   analyses: AdminAnalysis[]
+}
+
+export interface AdminAnalysisDetail extends AdminAnalysis {
+  email: string
 }
 
 export interface AdminUser {
@@ -269,6 +277,8 @@ export const adminApi = {
   usage: (interval: AdminInterval) =>
     get<AdminUsageResponse>(`/api/admin/usage?interval=${interval}`),
   analyses: () => get<AdminAnalysesResponse>('/api/admin/analyses'),
+  analysisDetail: (requestId: string) =>
+    get<AdminAnalysisDetail>(`/api/admin/analyses/${encodeURIComponent(requestId)}`),
   users: () => get<AdminUsersResponse>('/api/admin/users'),
 }
 

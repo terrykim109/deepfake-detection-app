@@ -3,11 +3,13 @@ import { AppShell } from '../components/AppShell'
 import {
   adminApi,
   type AdminAnalysis,
+  type AdminAnalysisDetail,
   type AdminInterval,
   type AdminUsageResponse,
   type AdminUsersResponse,
 } from '../api/client'
 import { Alert, Card, EmptyState, PageHeader, Select, Spinner } from '../components/ui'
+import { Modal } from '../components/Modal'
 
 const INTERVAL_OPTIONS = [
   { value: 'daily', label: 'Daily' },
@@ -16,6 +18,35 @@ const INTERVAL_OPTIONS = [
 ]
 type AnalysisFilter = 'all' | 'successful' | 'failed'
 type UserFilter = 'all' | 'verified' | 'unverified'
+type SortDirection = 'asc' | 'desc'
+type AnalysisSortKey = 'analysis' | 'user' | 'status' | 'completed' | 'confidence'
+type UserSortKey = 'email' | 'createdAt' | 'verification' | 'role'
+type SortState<Key extends string> = { key: Key; direction: SortDirection }
+
+function toggleSort<Key extends string>(current: SortState<Key>, key: Key): SortState<Key> {
+  return current.key === key
+    ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+    : { key, direction: 'asc' }
+}
+
+function sortArrow<Key extends string>(sort: SortState<Key>, key: Key): string {
+  return sort.key === key ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''
+}
+
+function sortAria<Key extends string>(sort: SortState<Key>, key: Key): 'none' | 'ascending' | 'descending' {
+  if (sort.key !== key) return 'none'
+  return sort.direction === 'asc' ? 'ascending' : 'descending'
+}
+
+function compareText(left: string | null | undefined, right: string | null | undefined): number {
+  return (left || '').localeCompare(right || '', undefined, { sensitivity: 'base' })
+}
+
+function compareDate(left: string | null, right: string | null): number {
+  const leftTime = left ? Date.parse(left) : Number.NEGATIVE_INFINITY
+  const rightTime = right ? Date.parse(right) : Number.NEGATIVE_INFINITY
+  return leftTime - rightTime
+}
 
 function formatDate(value: string | null): string {
   if (!value) return '—'
@@ -23,6 +54,38 @@ function formatDate(value: string | null): string {
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+}
+
+function getAnalysisPeriod(analysis: AdminAnalysis, interval: AdminInterval): string | null {
+  const timestamp = analysis.completedAt || analysis.createdAt
+  if (!timestamp) return null
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return null
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  if (interval === 'monthly') return `${year}-${month}`
+  if (interval === 'weekly') {
+    const monday = new Date(Date.UTC(year, date.getUTCMonth(), date.getUTCDate()))
+    const weekday = monday.getUTCDay() || 7
+    monday.setUTCDate(monday.getUTCDate() - weekday + 1)
+    return monday.toISOString().slice(0, 10)
+  }
+  return `${year}-${month}-${day}`
 }
 
 function formatPeriod(period: string, interval: AdminInterval): string {
@@ -64,7 +127,13 @@ function formatPeriod(period: string, interval: AdminInterval): string {
   })
 }
 
-function UsageChart({ usage }: { usage: AdminUsageResponse }) {
+function UsageChart({
+  usage,
+  onBucketClick,
+}: {
+  usage: AdminUsageResponse
+  onBucketClick: (period: string) => void
+}) {
   const max = Math.max(...usage.buckets.map((bucket) => bucket.totalAnalyses), 1)
   if (usage.buckets.length === 0) {
     return <EmptyState icon="/assets/icon-file.svg" message="No analysis activity recorded yet." />
@@ -74,7 +143,13 @@ function UsageChart({ usage }: { usage: AdminUsageResponse }) {
     <div className="admin-chart-wrap">
       <div className="admin-chart" role="img" aria-label={`${usage.interval} analysis usage chart`}>
         {usage.buckets.map((bucket) => (
-          <div className="admin-chart__column" key={bucket.period}>
+          <button
+            className="admin-chart__column"
+            key={bucket.period}
+            type="button"
+            onClick={() => onBucketClick(bucket.period)}
+            title={`View analyses for ${formatPeriod(bucket.period, usage.interval)}`}
+          >
             <span className="admin-chart__value">{bucket.totalAnalyses}</span>
             <div className="admin-chart__track">
               <div
@@ -84,7 +159,7 @@ function UsageChart({ usage }: { usage: AdminUsageResponse }) {
               />
             </div>
             <span className="admin-chart__label">{formatPeriod(bucket.period, usage.interval)}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -98,13 +173,50 @@ export const Admin: React.FC = () => {
   const [analyses, setAnalyses] = useState<AdminAnalysis[]>([])
   const [analysisFilter, setAnalysisFilter] = useState<AnalysisFilter>('all')
   const [analysisView, setAnalysisView] = useState<'chart' | 'list'>('chart')
+  const [analysisPeriod, setAnalysisPeriod] = useState<string | null>(null)
+  const [analysisSort, setAnalysisSort] = useState<SortState<AnalysisSortKey>>({
+    key: 'completed',
+    direction: 'desc',
+  })
   const [userFilter, setUserFilter] = useState<UserFilter>('all')
+  const [userSort, setUserSort] = useState<SortState<UserSortKey>>({
+    key: 'createdAt',
+    direction: 'desc',
+  })
   const [usageError, setUsageError] = useState('')
   const [usersError, setUsersError] = useState('')
   const [analysesError, setAnalysesError] = useState('')
   const [loadingUsage, setLoadingUsage] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingAnalyses, setLoadingAnalyses] = useState(true)
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null)
+  const [analysisDetail, setAnalysisDetail] = useState<AdminAnalysisDetail | null>(null)
+  const [analysisDetailError, setAnalysisDetailError] = useState('')
+  const [loadingAnalysisDetail, setLoadingAnalysisDetail] = useState(false)
+
+  useEffect(() => {
+    if (!selectedAnalysisId) {
+      setAnalysisDetail(null)
+      setAnalysisDetailError('')
+      return
+    }
+    let active = true
+    setLoadingAnalysisDetail(true)
+    setAnalysisDetailError('')
+    void adminApi.analysisDetail(selectedAnalysisId).then((response) => {
+      if (!active) return
+      if (response.error || !response.data) {
+        setAnalysisDetail(null)
+        setAnalysisDetailError(response.error || 'Could not load analysis details.')
+      } else {
+        setAnalysisDetail(response.data)
+      }
+      setLoadingAnalysisDetail(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [selectedAnalysisId])
 
   useEffect(() => {
     let active = true
@@ -123,6 +235,10 @@ export const Admin: React.FC = () => {
     return () => {
       active = false
     }
+  }, [interval])
+
+  useEffect(() => {
+    setAnalysisPeriod(null)
   }, [interval])
 
   useEffect(() => {
@@ -160,19 +276,45 @@ export const Admin: React.FC = () => {
     }
   }, [])
 
-  const visibleAnalyses = analyses.filter((analysis) => {
-    if (analysisFilter === 'successful') return ['success', 'completed'].includes(analysis.status)
-    if (analysisFilter === 'failed') return !['success', 'completed'].includes(analysis.status)
-    return true
-  })
   const visibleUsers = users?.users.filter((account) => {
     if (userFilter === 'verified') return account.isVerified
     if (userFilter === 'unverified') return !account.isVerified
     return true
   }) ?? []
+  const userEmails = new Map(users?.users.map((account) => [account.userId, account.email]) ?? [])
   const latestBucket = usage?.buckets.length
     ? usage.buckets[usage.buckets.length - 1]
     : null
+  const activePeriod = analysisPeriod ?? latestBucket?.period ?? null
+  const periodAnalyses = latestBucket
+    ? analyses.filter((analysis) => getAnalysisPeriod(analysis, interval) === activePeriod)
+    : []
+  const visibleAnalyses = periodAnalyses.filter((analysis) => {
+    if (analysisFilter === 'successful') return ['success', 'completed'].includes(analysis.status)
+    if (analysisFilter === 'failed') return !['success', 'completed'].includes(analysis.status)
+    return true
+  })
+  const sortedAnalyses = [...visibleAnalyses].sort((left, right) => {
+    let comparison = 0
+    if (analysisSort.key === 'analysis') comparison = compareText(left.requestId, right.requestId)
+    if (analysisSort.key === 'user') {
+      comparison = compareText(userEmails.get(left.userId) || left.userId, userEmails.get(right.userId) || right.userId)
+    }
+    if (analysisSort.key === 'status') comparison = compareText(left.status || 'unknown', right.status || 'unknown')
+    if (analysisSort.key === 'completed') comparison = compareDate(left.completedAt || left.createdAt, right.completedAt || right.createdAt)
+    if (analysisSort.key === 'confidence') comparison = (left.confidence ?? -1) - (right.confidence ?? -1)
+    if (comparison === 0) comparison = compareText(left.requestId, right.requestId)
+    return analysisSort.direction === 'asc' ? comparison : -comparison
+  })
+  const sortedUsers = [...visibleUsers].sort((left, right) => {
+    let comparison = 0
+    if (userSort.key === 'email') comparison = compareText(left.email, right.email)
+    if (userSort.key === 'createdAt') comparison = compareDate(left.createdAt, right.createdAt)
+    if (userSort.key === 'verification') comparison = Number(left.isVerified) - Number(right.isVerified)
+    if (userSort.key === 'role') comparison = compareText(left.role, right.role)
+    if (comparison === 0) comparison = compareText(left.userId, right.userId)
+    return userSort.direction === 'asc' ? comparison : -comparison
+  })
 
   return (
     <AppShell>
@@ -200,19 +342,19 @@ export const Admin: React.FC = () => {
           ) : usage ? (
             <>
               <div className="admin-stats">
-                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('all'); setAnalysisView('list') }}>
+                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisPeriod(latestBucket?.period ?? null); setAnalysisFilter('all'); setAnalysisView('list') }}>
                   <Card className="admin-stat" padding="md" interactive={analysisView === 'list' && analysisFilter === 'all'}>
                   <p className="admin-stat__label">Total analyses</p>
                   <p className="admin-stat__value">{latestBucket?.totalAnalyses ?? 0}</p>
                   </Card>
                 </button>
-                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('successful'); setAnalysisView('list') }}>
+                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisPeriod(latestBucket?.period ?? null); setAnalysisFilter('successful'); setAnalysisView('list') }}>
                   <Card className="admin-stat" padding="md" interactive={analysisFilter === 'successful'}>
                   <p className="admin-stat__label">Successful</p>
                   <p className="admin-stat__value">{latestBucket?.successfulAnalyses ?? 0}</p>
                   </Card>
                 </button>
-                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisFilter('failed'); setAnalysisView('list') }}>
+                <button className="admin-stat-button" type="button" onClick={() => { setAnalysisPeriod(latestBucket?.period ?? null); setAnalysisFilter('failed'); setAnalysisView('list') }}>
                   <Card className="admin-stat" padding="md" interactive={analysisFilter === 'failed'}>
                   <p className="admin-stat__label">Failed</p>
                   <p className="admin-stat__value">{latestBucket?.failedAnalyses ?? 0}</p>
@@ -223,13 +365,13 @@ export const Admin: React.FC = () => {
                 {analysisView === 'chart' ? (
                   <>
                     <h3 className="admin-subtitle">Analysis activity ({usage.interval})</h3>
-                    <UsageChart usage={usage} />
+                    <UsageChart usage={usage} onBucketClick={(period) => { setAnalysisPeriod(period); setAnalysisFilter('all'); setAnalysisView('list') }} />
                   </>
                 ) : (
                   <>
                     <div className="admin-panel-heading">
                       <h3 className="admin-subtitle">
-                        {analysisFilter === 'all' ? 'All analyses' : analysisFilter === 'successful' ? 'Successful analyses' : 'Failed analyses'}
+                        {analysisFilter === 'all' ? 'All analyses' : analysisFilter === 'successful' ? 'Successful analyses' : 'Failed analyses'} ({activePeriod ? formatPeriod(activePeriod, interval) : 'selected period'})
                       </h3>
                       <button className="admin-view-chart-button" type="button" onClick={() => setAnalysisView('chart')}>
                         Back to chart
@@ -241,10 +383,25 @@ export const Admin: React.FC = () => {
                     ) : (
                       <div className="admin-table-wrap">
                         <table className="admin-table">
-                          <thead><tr><th>Analysis</th><th>Status</th><th>Completed</th><th>Confidence</th></tr></thead>
-                          <tbody>{visibleAnalyses.map((analysis) => (
+                          <thead><tr>
+                            <th aria-sort={sortAria(analysisSort, 'analysis')}><button className="admin-sort-button" type="button" onClick={() => setAnalysisSort((sort) => toggleSort(sort, 'analysis'))}>Analysis{sortArrow(analysisSort, 'analysis')}</button></th>
+                            <th aria-sort={sortAria(analysisSort, 'user')}><button className="admin-sort-button" type="button" onClick={() => setAnalysisSort((sort) => toggleSort(sort, 'user'))}>User{sortArrow(analysisSort, 'user')}</button></th>
+                            <th aria-sort={sortAria(analysisSort, 'status')}><button className="admin-sort-button" type="button" onClick={() => setAnalysisSort((sort) => toggleSort(sort, 'status'))}>Status{sortArrow(analysisSort, 'status')}</button></th>
+                            <th aria-sort={sortAria(analysisSort, 'completed')}><button className="admin-sort-button" type="button" onClick={() => setAnalysisSort((sort) => toggleSort(sort, 'completed'))}>Completed{sortArrow(analysisSort, 'completed')}</button></th>
+                            <th aria-sort={sortAria(analysisSort, 'confidence')}><button className="admin-sort-button" type="button" onClick={() => setAnalysisSort((sort) => toggleSort(sort, 'confidence'))}>Confidence{sortArrow(analysisSort, 'confidence')}</button></th>
+                          </tr></thead>
+                          <tbody>{sortedAnalyses.map((analysis) => (
                             <tr key={analysis.requestId}>
-                              <td>{analysis.requestId}</td>
+                              <td>
+                                <button
+                                  className="admin-analysis-link"
+                                  type="button"
+                                  onClick={() => setSelectedAnalysisId(analysis.requestId)}
+                                >
+                                  {analysis.requestId}
+                                </button>
+                              </td>
+                              <td>{userEmails.get(analysis.userId) || analysis.userId || '—'}</td>
                               <td>{analysis.status || 'Unknown'}</td>
                               <td>{formatDate(analysis.completedAt || analysis.createdAt)}</td>
                               <td>{analysis.confidence == null ? '—' : `${analysis.confidence}%`}</td>
@@ -294,10 +451,15 @@ export const Admin: React.FC = () => {
                   <div className="admin-table-wrap">
                     <table className="admin-table">
                       <thead>
-                        <tr><th>Email</th><th>Registration date</th><th>Verification</th><th>Role</th></tr>
+                        <tr>
+                          <th aria-sort={sortAria(userSort, 'email')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'email'))}>Email{sortArrow(userSort, 'email')}</button></th>
+                          <th aria-sort={sortAria(userSort, 'createdAt')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'createdAt'))}>Registration date{sortArrow(userSort, 'createdAt')}</button></th>
+                          <th aria-sort={sortAria(userSort, 'verification')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'verification'))}>Verification{sortArrow(userSort, 'verification')}</button></th>
+                          <th aria-sort={sortAria(userSort, 'role')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'role'))}>Role{sortArrow(userSort, 'role')}</button></th>
+                        </tr>
                       </thead>
                       <tbody>
-                        {visibleUsers.map((account) => (
+                        {sortedUsers.map((account) => (
                           <tr key={account.userId}>
                             <td>{account.email || '—'}</td>
                             <td>{formatDate(account.createdAt)}</td>
@@ -314,6 +476,34 @@ export const Admin: React.FC = () => {
           ) : null}
         </section>
       </div>
+      {selectedAnalysisId ? (
+        <Modal
+          title="Analysis details"
+          subtitle={selectedAnalysisId}
+          tone={analysisDetail?.status === 'success' || analysisDetail?.status === 'completed' ? 'success' : 'danger'}
+          onClose={() => setSelectedAnalysisId(null)}
+        >
+          {loadingAnalysisDetail ? (
+            <div className="admin-inline-loading"><Spinner /><span>Loading details…</span></div>
+          ) : analysisDetailError ? (
+            <Alert tone="error">{analysisDetailError}</Alert>
+          ) : analysisDetail ? (
+            <dl className="admin-detail-grid">
+              <div><dt>User</dt><dd>{analysisDetail.email || analysisDetail.userId || '—'}</dd></div>
+              <div><dt>Status</dt><dd>{analysisDetail.status || 'Unknown'}</dd></div>
+              <div><dt>Started</dt><dd>{formatDateTime(analysisDetail.startedAt || analysisDetail.createdAt)}</dd></div>
+              <div><dt>Completed</dt><dd>{formatDateTime(analysisDetail.completedAt)}</dd></div>
+              <div><dt>Confidence</dt><dd>{analysisDetail.confidence == null ? '—' : `${analysisDetail.confidence}%`}</dd></div>
+              <div><dt>Provider</dt><dd>{analysisDetail.provider || '—'}</dd></div>
+              <div><dt>Reverse search</dt><dd>{analysisDetail.reverseSearchStatus || '—'}</dd></div>
+              <div><dt>Forensics</dt><dd>{analysisDetail.forensicsStatus || '—'}</dd></div>
+              {analysisDetail.error ? (
+                <div className="admin-detail-grid__full"><dt>Error</dt><dd>{analysisDetail.error}</dd></div>
+              ) : null}
+            </dl>
+          ) : null}
+        </Modal>
+      ) : null}
     </AppShell>
   )
 }

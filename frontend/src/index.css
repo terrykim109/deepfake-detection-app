@@ -1069,6 +1069,12 @@
   justify-content: end;
   height: 100%;
   gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 .admin-chart__value,
 .admin-chart__label {
@@ -1109,6 +1115,64 @@
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.admin-sort-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-sort-button:hover {
+  color: var(--text-strong);
+}
+.admin-analysis-link {
+  padding: 0;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-analysis-link:hover {
+  text-decoration: underline;
+}
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+}
+.admin-detail-grid div {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--borders);
+  border-radius: var(--radius-sm);
+}
+.admin-detail-grid dt {
+  color: var(--secondary-text);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.admin-detail-grid dd {
+  margin: 4px 0 0;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.admin-detail-grid__full {
+  grid-column: 1 / -1;
+}
+@media (max-width: 767px) {
+  .admin-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .admin-table td { color: var(--text-strong); }
 .admin-role {

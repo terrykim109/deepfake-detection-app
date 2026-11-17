@@ -30,6 +30,9 @@ def complete_analysis_request(
     status: str,
     confidence: int | None = None,
     error: str | None = None,
+    provider: str | None = None,
+    reverse_search_status: str | None = None,
+    forensics_status: str | None = None,
 ) -> None:
     payload: dict[str, Any] = {
         "status": status,
@@ -39,4 +42,10 @@ def complete_analysis_request(
         payload["confidence"] = confidence
     if error:
         payload["error"] = error[:500]
+    if provider:
+        payload["provider"] = provider[:100]
+    if reverse_search_status:
+        payload["reverseSearchStatus"] = reverse_search_status[:100]
+    if forensics_status:
+        payload["forensicsStatus"] = forensics_status[:100]
     analysis_requests_ref.document(request_id).set(payload, merge=True)

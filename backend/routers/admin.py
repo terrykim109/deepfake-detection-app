@@ -33,14 +33,10 @@ async def admin_usage(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="interval must be daily, weekly, or monthly",
         )
-
     daily_metrics = _documents(db.collection("adminMetrics"))
     if daily_metrics:
         return aggregate_daily_metrics(daily_metrics, interval=interval)
-    return aggregate_analysis_requests(
-        _documents(analysis_requests_ref),
-        interval=interval,
-    )
+    return aggregate_analysis_requests(_documents(analysis_requests_ref), interval=interval)
 
 
 @router.get("/analyses")
@@ -60,6 +56,10 @@ async def admin_analyses(user: dict = Depends(require_admin)):
                 "completedAt": record.get("completedAt"),
                 "confidence": record.get("confidence"),
                 "error": record.get("error"),
+                "startedAt": record.get("startedAt"),
+                "provider": record.get("provider"),
+                "reverseSearchStatus": record.get("reverseSearchStatus"),
+                "forensicsStatus": record.get("forensicsStatus"),
             }
         )
     analyses.sort(
@@ -67,6 +67,42 @@ async def admin_analyses(user: dict = Depends(require_admin)):
         reverse=True,
     )
     return {"analyses": analyses}
+
+
+@router.get("/analyses/{request_id}")
+async def admin_analysis_detail(
+    request_id: str,
+    user: dict = Depends(require_admin),
+):
+    del user
+    for record in _documents(analysis_requests_ref):
+        if record.get("requestId") == request_id:
+            user_id = record.get("userId", "")
+            email = ""
+            if user_id:
+                try:
+                    account = auth.get_user(user_id)
+                    email = account.email or ""
+                except Exception:
+                    email = ""
+            return {
+                "requestId": request_id,
+                "userId": user_id,
+                "email": email,
+                "status": str(record.get("status", "")).lower(),
+                "startedAt": record.get("startedAt"),
+                "createdAt": record.get("createdAt"),
+                "completedAt": record.get("completedAt"),
+                "confidence": record.get("confidence"),
+                "error": record.get("error"),
+                "provider": record.get("provider"),
+                "reverseSearchStatus": record.get("reverseSearchStatus"),
+                "forensicsStatus": record.get("forensicsStatus"),
+            }
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Analysis not found.",
+    )
 
 
 @router.get("/users")

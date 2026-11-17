@@ -229,6 +229,8 @@ async def run_analysis(
             request_id,
             status="failure",
             error=detection_out.get("error"),
+            reverse_search_status=online_search.get("status"),
+            forensics_status="ok" if forensics_ok else "failed",
         )
         try:
             log_event(
@@ -259,6 +261,9 @@ async def run_analysis(
             request_id,
             status="success",
             confidence=detection.confidence,
+            provider=detection.provider,
+            reverse_search_status=online_search.get("status"),
+            forensics_status="ok" if forensics_ok else "failed",
         )
         result_payload = {
             "id": result_id,
@@ -293,6 +298,8 @@ async def run_analysis(
             request_id,
             status="failure",
             error=detection_error,
+            reverse_search_status=online_search.get("status"),
+            forensics_status="ok" if forensics_ok else "failed",
         )
         try:
             log_event(
