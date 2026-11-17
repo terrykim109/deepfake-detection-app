@@ -11,6 +11,7 @@ export const Logo: React.FC<{ to?: string }> = ({ to = '/' }) => (
 
 const ANALYZE_PATHS = ['/upload', '/results']
 const HISTORY_PATHS = ['/history', '/result/']
+const LEARN_PATHS = ['/learn']
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const analyzeActive = ANALYZE_PATHS.some((p) => pathname.startsWith(p))
   const historyActive = HISTORY_PATHS.some((p) => pathname.startsWith(p))
+  const learnActive = LEARN_PATHS.some((p) => pathname.startsWith(p))
 
   return (
     <div className="ui-container">
@@ -51,6 +53,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           onClick={() => navigate('/history')}
         >
           History
+        </button>
+        <button
+          type="button"
+          className="nav-tab"
+          aria-current={learnActive ? 'page' : undefined}
+          onClick={() => navigate('/learn')}
+        >
+          Learn
         </button>
       </nav>
 

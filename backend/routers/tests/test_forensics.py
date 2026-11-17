@@ -60,7 +60,7 @@ def test_forensics_run_returns_all_sections():
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert set(body["forensics"].keys()) == {"metadata", "ela", "noise", "c2pa"}
+    assert set(body["forensics"].keys()) == {"metadata", "ela", "noise", "edges", "c2pa"}
     assert body["forensics"]["metadata"]["available"] is True
 
 

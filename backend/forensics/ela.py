@@ -7,24 +7,66 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageChops
 
+from .local_outliers import draw_outlier_outlines, local_outlier_mask
+
+BLOCK_SIZE = 16
+
+
+def _diff_array(image_bytes: bytes, quality: int) -> np.ndarray:
+    with Image.open(io.BytesIO(image_bytes)) as original:
+        original_rgb = original.convert("RGB")
+
+    resaved_buffer = io.BytesIO()
+    original_rgb.save(resaved_buffer, format="JPEG", quality=quality)
+    resaved_buffer.seek(0)
+    with Image.open(resaved_buffer) as resaved:
+        diff = ImageChops.difference(original_rgb, resaved)
+
+    return np.asarray(diff, dtype=np.float64)
+
+
+def _block_grid(diff_array: np.ndarray) -> np.ndarray:
+    """Per-BLOCK_SIZE-block mean error, from the per-pixel RGB diff array."""
+    intensity = diff_array.mean(axis=-1)
+    height, width = intensity.shape
+    rows = max(height // BLOCK_SIZE, 1)
+    cols = max(width // BLOCK_SIZE, 1)
+
+    block_mean = np.zeros((rows, cols), dtype=np.float64)
+    for r in range(rows):
+        for c in range(cols):
+            y0, y1 = r * BLOCK_SIZE, min((r + 1) * BLOCK_SIZE, height)
+            x0, x1 = c * BLOCK_SIZE, min((c + 1) * BLOCK_SIZE, width)
+            block_mean[r, c] = intensity[y0:y1, x0:x1].mean()
+    return block_mean
+
+
+def ela_block_grid(image_bytes: bytes, quality: int = 90) -> np.ndarray:
+    """Raw per-block ELA-error grid, for the Learn-page precompute script."""
+    return _block_grid(_diff_array(image_bytes, quality))
+
 
 def generate_ela(image_bytes: bytes, quality: int = 90) -> dict[str, Any]:
     try:
-        with Image.open(io.BytesIO(image_bytes)) as original:
-            original_rgb = original.convert("RGB")
-
-        resaved_buffer = io.BytesIO()
-        original_rgb.save(resaved_buffer, format="JPEG", quality=quality)
-        resaved_buffer.seek(0)
-        with Image.open(resaved_buffer) as resaved:
-            diff = ImageChops.difference(original_rgb, resaved)
-
-        diff_array = np.asarray(diff, dtype=np.float64)
+        diff_array = _diff_array(image_bytes, quality)
         max_error = float(diff_array.max()) if diff_array.size else 0.0
         mean_error = float(diff_array.mean()) if diff_array.size else 0.0
 
+        if diff_array.size:
+            block_mean = _block_grid(diff_array)
+            outlier_mask = local_outlier_mask(block_mean)
+            outlier_count = int(outlier_mask.sum())
+            total_block_count = int(block_mean.size)
+        else:
+            outlier_mask = None
+            outlier_count = 0
+            total_block_count = 0
+
         scale = 255.0 / max_error if max_error > 0 else 1.0
         amplified = np.clip(diff_array * scale, 0, 255).astype(np.uint8)
+        if outlier_mask is not None:
+            # amplified is RGB (from a PIL diff image), so red is (255, 0, 0) here.
+            draw_outlier_outlines(amplified, outlier_mask, BLOCK_SIZE, color=(255, 0, 0))
         ela_image = Image.fromarray(amplified)
 
         output_buffer = io.BytesIO()
@@ -37,6 +79,9 @@ def generate_ela(image_bytes: bytes, quality: int = 90) -> dict[str, Any]:
             "mean_error": mean_error,
             "max_error": max_error,
             "jpeg_quality": quality,
+            "outlier_block_count": outlier_count,
+            "total_block_count": total_block_count,
+            "block_size": BLOCK_SIZE,
         }
     except Exception as exc:
         return {"available": False, "error": str(exc)}
