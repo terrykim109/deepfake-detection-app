@@ -11,6 +11,7 @@ backend/*.pyc
 backend/tmp_uploads/
 backend/.pytest_cache/
 
+/venv
 .env
 .env.local
 .env.*

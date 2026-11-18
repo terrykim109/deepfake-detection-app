@@ -99,21 +99,45 @@ Backend: `http://localhost:8000`
 Application administrators are existing Firebase Authentication accounts with
 the verified custom claim `admin: true`. This is separate from Firebase
 project administrator access. The claim is checked by the FastAPI backend,
-not just by the frontend.
+not just by the frontend. Admins can open `/admin` for usage metrics and the
+user list.
 
-After configuring trusted Firebase Admin SDK credentials, run the assignment
-script from the `backend` directory. It accepts existing account emails only
-and allows at most five application administrators:
+After configuring trusted Firebase Admin SDK credentials, run the script from
+the `backend` directory. It accepts existing account emails only and allows at
+most five application administrators.
+
+**Add admin**
 
 ```bash
+cd backend
 python -m scripts.set_admin_claim --email admin@example.com
 # Repeat --email for additional existing accounts.
 ```
 
+**Demonstrate admin**
+
+1. Sign out and sign back in with that account (refreshes the ID token claim).
+2. Confirm the **Admin** tab appears in the nav and `/admin` loads metrics/users.
+3. Optional API check with a fresh token:
+
+```bash
+curl -H "Authorization: Bearer <ID_TOKEN>" http://localhost:8000/api/admin/users
+```
+
+A non-admin token should receive `403`.
+
+**Remove admin**
+
+```bash
+cd backend
+python -m scripts.set_admin_claim --revoke --email admin@example.com
+```
+
+Then sign out and sign back in. The Admin tab disappears and `/admin` redirects
+away.
+
 The script preserves other custom claims, refuses unknown accounts, and is not
-available through an HTTP endpoint. Each designated user must refresh their
-Firebase ID token (normally by signing out and back in) before the new claim
-is included in backend requests.
+available through an HTTP endpoint.
 
 ### Frontend
 

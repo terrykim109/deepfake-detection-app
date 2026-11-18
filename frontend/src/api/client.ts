@@ -25,6 +25,13 @@ function authHeaders(base?: HeadersInit, explicitToken?: string | null): Headers
 }
 
 function errorMessage(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const response = data as Record<string, unknown>
+    for (const key of ['detection_error', 'diagnostic_error', 'diagnosticError', 'detail']) {
+      const value = response[key]
+      if (typeof value === 'string' && value.trim()) return value
+    }
+  }
   if (data && typeof data === 'object' && 'detail' in data) {
     const detail = (data as { detail: unknown }).detail
     if (typeof detail === 'string') return detail
@@ -235,13 +242,38 @@ export interface AdminUsageResponse {
   buckets: AdminUsageBucket[]
 }
 
+export interface AdminAnalysis {
+  requestId: string
+  userId: string
+  status: string
+  createdAt: string | null
+  completedAt: string | null
+  confidence: number | null
+  error: string | null
+  startedAt: string | null
+  provider: string | null
+  reverseSearchStatus: string | null
+  forensicsStatus: string | null
+  diagnosticError: string | null
+}
+
+export interface AdminAnalysesResponse {
+  analyses: AdminAnalysis[]
+}
+
+export interface AdminAnalysisDetail extends AdminAnalysis {
+  email: string
+}
+
 export interface AdminUser {
   userId: string
   email: string
   displayName: string | null
   createdAt: string | null
+  lastLogin: string | null
   isVerified: boolean
   role: 'admin' | 'user'
+  status: 'active' | 'disabled'
 }
 
 export interface AdminUsersResponse {
@@ -254,6 +286,9 @@ export interface AdminUsersResponse {
 export const adminApi = {
   usage: (interval: AdminInterval) =>
     get<AdminUsageResponse>(`/api/admin/usage?interval=${interval}`),
+  analyses: () => get<AdminAnalysesResponse>('/api/admin/analyses'),
+  analysisDetail: (requestId: string) =>
+    get<AdminAnalysisDetail>(`/api/admin/analyses/${encodeURIComponent(requestId)}`),
   users: () => get<AdminUsersResponse>('/api/admin/users'),
 }
 

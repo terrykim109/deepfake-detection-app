@@ -14,7 +14,12 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 def _documents(collection: Any) -> list[dict[str, Any]]:
-    return [doc.to_dict() or {} for doc in collection.stream()]
+    documents = []
+    for doc in collection.stream():
+        data = doc.to_dict() or {}
+        data.setdefault("requestId", doc.id)
+        documents.append(data)
+    return documents
 
 
 @router.get("/usage")
@@ -28,13 +33,77 @@ async def admin_usage(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="interval must be daily, weekly, or monthly",
         )
-
     daily_metrics = _documents(db.collection("adminMetrics"))
     if daily_metrics:
         return aggregate_daily_metrics(daily_metrics, interval=interval)
-    return aggregate_analysis_requests(
-        _documents(analysis_requests_ref),
-        interval=interval,
+    return aggregate_analysis_requests(_documents(analysis_requests_ref), interval=interval)
+
+
+@router.get("/analyses")
+async def admin_analyses(user: dict = Depends(require_admin)):
+    del user
+    analyses = []
+    for record in _documents(analysis_requests_ref):
+        request_id = record.get("requestId")
+        if not request_id:
+            continue
+        analyses.append(
+            {
+                "requestId": request_id,
+                "userId": record.get("userId", ""),
+                "status": str(record.get("status", "")).lower(),
+                "createdAt": record.get("createdAt"),
+                "completedAt": record.get("completedAt"),
+                "confidence": record.get("confidence"),
+                "error": record.get("error"),
+                "startedAt": record.get("startedAt"),
+                "provider": record.get("provider"),
+                "reverseSearchStatus": record.get("reverseSearchStatus"),
+                "forensicsStatus": record.get("forensicsStatus"),
+                "diagnosticError": record.get("diagnosticError"),
+            }
+        )
+    analyses.sort(
+        key=lambda item: item["completedAt"] or item["createdAt"] or "",
+        reverse=True,
+    )
+    return {"analyses": analyses}
+
+
+@router.get("/analyses/{request_id}")
+async def admin_analysis_detail(
+    request_id: str,
+    user: dict = Depends(require_admin),
+):
+    del user
+    for record in _documents(analysis_requests_ref):
+        if record.get("requestId") == request_id:
+            user_id = record.get("userId", "")
+            email = ""
+            if user_id:
+                try:
+                    account = auth.get_user(user_id)
+                    email = account.email or ""
+                except Exception:
+                    email = ""
+            return {
+                "requestId": request_id,
+                "userId": user_id,
+                "email": email,
+                "status": str(record.get("status", "")).lower(),
+                "startedAt": record.get("startedAt"),
+                "createdAt": record.get("createdAt"),
+                "completedAt": record.get("completedAt"),
+                "confidence": record.get("confidence"),
+                "error": record.get("error"),
+                "provider": record.get("provider"),
+                "reverseSearchStatus": record.get("reverseSearchStatus"),
+                "forensicsStatus": record.get("forensicsStatus"),
+                "diagnosticError": record.get("diagnosticError"),
+            }
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Analysis not found.",
     )
 
 
@@ -51,6 +120,7 @@ async def admin_users(user: dict = Depends(require_admin)):
         for account in page.users:
             profile = profiles.get(account.uid, {})
             created_at = _creation_time(account)
+            last_login = _last_login_time(account)
             claims = account.custom_claims or {}
             users.append(
                 {
@@ -58,8 +128,10 @@ async def admin_users(user: dict = Depends(require_admin)):
                     "email": account.email or profile.get("email") or "",
                     "displayName": account.display_name or profile.get("display_name"),
                     "createdAt": created_at,
+                    "lastLogin": last_login,
                     "isVerified": bool(account.email_verified),
                     "role": "admin" if claims.get("admin") is True else "user",
+                    "status": "disabled" if getattr(account, "disabled", False) else "active",
                 }
             )
         page = page.get_next_page()
@@ -77,6 +149,19 @@ async def admin_users(user: dict = Depends(require_admin)):
 def _creation_time(account: Any) -> str | None:
     metadata = getattr(account, "user_metadata", None)
     timestamp = getattr(metadata, "creation_timestamp", None)
+    if timestamp is None:
+        return None
+    try:
+        from datetime import datetime, timezone
+
+        return datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).isoformat()
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _last_login_time(account: Any) -> str | None:
+    metadata = getattr(account, "user_metadata", None)
+    timestamp = getattr(metadata, "last_sign_in_timestamp", None)
     if timestamp is None:
         return None
     try:

@@ -22,6 +22,33 @@ _MAX_TOKENS = 1600
 _TEMPERATURE = 0.2  # Keep responses relatively consistent
 _MAX_FINDINGS = 3  # Maximum suspicious regions retained per result
 _DISAGREEMENT_THRESHOLD = 30 
+_PUBLIC_ANALYSIS_ERROR = (
+    "We couldn't analyze this image right now. "
+    "Please try again in a moment."
+)
+
+
+def _sanitize_diagnostic(value: str) -> str:
+    text = re.sub(r"(?i)\bbearer\s+[A-Za-z0-9._~-]+", "Bearer [REDACTED]", value)
+    text = re.sub(r"(?i)\b(api[_-]?key|authorization|token)\s*[:=]\s*[^\s,&]+", r"\1=[REDACTED]", text)
+    return " ".join(text.strip().split())[:1500]
+
+
+def _http_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            message = error.get("message") or error.get("detail")
+            if message:
+                return str(message)
+        for key in ("detail", "message"):
+            if payload.get(key):
+                return str(payload[key])
+    return response.text[:300]
 
 _PROMPT = """You are an image forensics assistant helping detect AI-generated or digitally manipulated photos.
 
@@ -338,7 +365,7 @@ def _call_model(
 
     # Handle HTTP errors, including rate limits and unavailable models.
     if response.status_code >= 400:
-        detail = response.text[:300]
+        detail = _sanitize_diagnostic(_http_error_detail(response))
         raise RuntimeError(
             f"{model} HTTP {response.status_code}: {detail}"
         )
@@ -546,7 +573,7 @@ class OpenRouterEnsembleDetector:
                         scores.append(future.result())
                     except Exception as exc:
                         # Keep failed-model details for diagnosing provider errors.
-                        errors.append(f"{model}: {exc}")
+                        errors.append(f"{model}: {_sanitize_diagnostic(str(exc))}")
 
         # Keep using any successful model results rather than failing
         # the entire analysis because one or two providers were unavailable.
@@ -556,9 +583,15 @@ class OpenRouterEnsembleDetector:
                 "[openrouter] all models failed: "
                 + ("; ".join(errors[:3]) if errors else "unknown error")
             )
+            diagnostic = (
+                "; ".join(errors[:3])
+                if errors
+                else "All configured OpenRouter vision models failed."
+            )
             raise DetectionError(
-                "We couldn't analyze this image right now. "
-                "Please try again in a moment."
+                diagnostic,
+                diagnostic=diagnostic,
+                user_message=_PUBLIC_ANALYSIS_ERROR,
             )
 
         return _combine(scores)

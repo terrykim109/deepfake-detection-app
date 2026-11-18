@@ -71,3 +71,33 @@ def test_grant_rejects_more_than_five_total_admins(monkeypatch):
 
     with pytest.raises(ValueError, match="exceed the limit"):
         set_admin_claim.grant_admin_claims(["sixth@example.com"])
+
+
+def test_revoke_removes_admin_and_preserves_other_claims(monkeypatch):
+    selected = _User("uid-1", "admin@example.com", {"team": "ops", "admin": True})
+    calls = []
+
+    monkeypatch.setattr(set_admin_claim.auth, "get_user_by_email", lambda email: selected)
+    monkeypatch.setattr(
+        set_admin_claim.auth,
+        "set_custom_user_claims",
+        lambda uid, claims: calls.append((uid, claims)),
+    )
+
+    assert set_admin_claim.revoke_admin_claims(["admin@example.com"]) == ["uid-1"]
+    assert calls == [("uid-1", {"team": "ops"})]
+
+
+def test_revoke_skips_accounts_without_admin_claim(monkeypatch):
+    selected = _User("uid-1", "user@example.com", {"team": "ops"})
+    calls = []
+
+    monkeypatch.setattr(set_admin_claim.auth, "get_user_by_email", lambda email: selected)
+    monkeypatch.setattr(
+        set_admin_claim.auth,
+        "set_custom_user_claims",
+        lambda uid, claims: calls.append((uid, claims)),
+    )
+
+    assert set_admin_claim.revoke_admin_claims(["user@example.com"]) == []
+    assert calls == []

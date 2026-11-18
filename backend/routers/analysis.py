@@ -2,6 +2,7 @@ import asyncio
 import os
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse
 
 from analysis_limits import (
     check_can_start,
@@ -157,17 +158,23 @@ async def run_analysis(
     async def _run_detection():
         try:
             result = await asyncio.to_thread(_detect)
-            return {"ok": True, "detection": result, "error": None}
+            return {"ok": True, "detection": result, "error": None, "diagnostic": None}
         except DetectionError as exc:
-            return {"ok": False, "detection": None, "error": exc.message}
-        except Exception:
+            return {
+                "ok": False,
+                "detection": None,
+                "error": exc.user_message,
+                "diagnostic": exc.diagnostic,
+            }
+        except Exception as exc:
             return {
                 "ok": False,
                 "detection": None,
                 "error": (
                     "The analysis service could not complete this request. "
-                    "Please try uploading again when the service is available."
+                    "Please try uploading again."
                 ),
+                "diagnostic": f"{exc.__class__.__name__}: {exc}",
             }
 
     async def _run_online_search():
@@ -229,6 +236,9 @@ async def run_analysis(
             request_id,
             status="failure",
             error=detection_out.get("error"),
+            reverse_search_status=online_search.get("status"),
+            forensics_status="ok" if forensics_ok else "failed",
+            diagnostic_error=detection_out.get("diagnostic"),
         )
         try:
             log_event(
@@ -243,12 +253,28 @@ async def run_analysis(
             )
         except Exception:
             pass
-        raise HTTPException(
+        diagnostic = (
+            detection_out.get("diagnostic")
+            or detection_out.get("error")
+            or "Analysis failed."
+        )
+        print(
+            f"[analysis] detection failure for {request_id}: "
+            + str(diagnostic)
+        )
+        return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                f"{detection_out.get('error') or 'Analysis failed.'} "
-                "Your original image has been deleted. Please try uploading again."
-            ),
+            content={
+                "detail": (
+                    "We couldn't analyze this image right now. "
+                    "Please try again in a moment."
+                ),
+                "detection_error": (
+                    "We couldn't analyze this image right now. "
+                    "Please try again in a moment."
+                ),
+                "diagnostic_error": detection_out.get("diagnostic"),
+            },
         )
 
     result_payload = None
@@ -259,6 +285,9 @@ async def run_analysis(
             request_id,
             status="success",
             confidence=detection.confidence,
+            provider=detection.provider,
+            reverse_search_status=online_search.get("status"),
+            forensics_status="ok" if forensics_ok else "failed",
         )
         result_payload = {
             "id": result_id,
@@ -288,11 +317,17 @@ async def run_analysis(
         except Exception:
             pass
     else:
-        detection_error = detection_out.get("error") or "Deepfake detection could not be completed."
+        detection_error = (
+            detection_out.get("error")
+            or "Deepfake detection could not be completed."
+        )
         complete_analysis_request(
             request_id,
             status="failure",
             error=detection_error,
+            reverse_search_status=online_search.get("status"),
+            forensics_status="ok" if forensics_ok else "failed",
+            diagnostic_error=detection_out.get("diagnostic"),
         )
         try:
             log_event(

@@ -29,6 +29,13 @@ class Detector(Protocol):
 class DetectionError(Exception):
     """Raised when a detection provider cannot complete analysis"""
 
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
+    def __init__(
+        self,
+        message: str,
+        diagnostic: str | None = None,
+        user_message: str | None = None,
+    ):
+        super().__init__(user_message or message)
+        self.message = user_message or message
+        self.user_message = user_message or message
+        self.diagnostic = diagnostic
