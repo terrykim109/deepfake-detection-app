@@ -33,6 +33,7 @@ def complete_analysis_request(
     provider: str | None = None,
     reverse_search_status: str | None = None,
     forensics_status: str | None = None,
+    diagnostic_error: str | None = None,
 ) -> None:
     payload: dict[str, Any] = {
         "status": status,
@@ -45,7 +46,17 @@ def complete_analysis_request(
     if provider:
         payload["provider"] = provider[:100]
     if reverse_search_status:
-        payload["reverseSearchStatus"] = reverse_search_status[:100]
+        payload["reverseSearchStatus"] = (
+            "completed"
+            if str(reverse_search_status).lower() in {"ok", "empty", "success", "completed"}
+            else reverse_search_status[:100]
+        )
     if forensics_status:
-        payload["forensicsStatus"] = forensics_status[:100]
+        payload["forensicsStatus"] = (
+            "completed"
+            if str(forensics_status).lower() in {"ok", "success", "completed"}
+            else forensics_status[:100]
+        )
+    if diagnostic_error:
+        payload["diagnosticError"] = diagnostic_error[:1500]
     analysis_requests_ref.document(request_id).set(payload, merge=True)

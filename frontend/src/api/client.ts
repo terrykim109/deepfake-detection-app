@@ -25,6 +25,13 @@ function authHeaders(base?: HeadersInit, explicitToken?: string | null): Headers
 }
 
 function errorMessage(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const response = data as Record<string, unknown>
+    for (const key of ['detection_error', 'diagnostic_error', 'diagnosticError', 'detail']) {
+      const value = response[key]
+      if (typeof value === 'string' && value.trim()) return value
+    }
+  }
   if (data && typeof data === 'object' && 'detail' in data) {
     const detail = (data as { detail: unknown }).detail
     if (typeof detail === 'string') return detail
@@ -247,6 +254,7 @@ export interface AdminAnalysis {
   provider: string | null
   reverseSearchStatus: string | null
   forensicsStatus: string | null
+  diagnosticError: string | null
 }
 
 export interface AdminAnalysesResponse {

@@ -73,7 +73,7 @@ export function createHttpDetector(getUserId: () => string | null): Detector {
           report('failed')
           throw new Error(
             res.error ||
-              'The analysis service could not complete this request. Your image was deleted — please try uploading again.',
+              'The analysis API returned an invalid response without an error detail.',
           )
         }
 

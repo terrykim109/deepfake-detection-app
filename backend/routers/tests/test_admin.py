@@ -33,6 +33,7 @@ class _FakeDb:
                         {
                             "createdAt": "2026-01-05T00:00:00+00:00",
                             "status": "success",
+                            "diagnosticError": "openai/model: HTTP 429: rate limit",
                         },
                     )
                 ]
@@ -120,6 +121,7 @@ def test_admin_analysis_detail_returns_record():
         app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["requestId"] == "a1"
+    assert "HTTP 429" in response.json()["diagnosticError"]
 
 
 def test_admin_analysis_detail_returns_404_for_unknown_id():

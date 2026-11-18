@@ -70,6 +70,13 @@ function formatDateTime(value: string | null): string {
       })
 }
 
+function formatPipelineStatus(value: string | null): string {
+  if (!value) return '—'
+  if (['ok', 'empty', 'success', 'completed'].includes(value.toLowerCase())) return 'Completed'
+  if (['error', 'failed', 'failure'].includes(value.toLowerCase())) return 'Failed'
+  return value
+}
+
 function getAnalysisPeriod(analysis: AdminAnalysis, interval: AdminInterval): string | null {
   const timestamp = analysis.completedAt || analysis.createdAt
   if (!timestamp) return null
@@ -489,17 +496,30 @@ export const Admin: React.FC = () => {
             <Alert tone="error">{analysisDetailError}</Alert>
           ) : analysisDetail ? (
             <dl className="admin-detail-grid">
-              <div><dt>User</dt><dd>{analysisDetail.email || analysisDetail.userId || '—'}</dd></div>
+              <div className="admin-detail-grid__full"><dt>User</dt><dd>{analysisDetail.email || analysisDetail.userId || '—'}</dd></div>
               <div><dt>Status</dt><dd>{analysisDetail.status || 'Unknown'}</dd></div>
+              <div><dt>Confidence</dt><dd>{analysisDetail.confidence == null ? '—' : `${analysisDetail.confidence}%`}</dd></div>
               <div><dt>Started</dt><dd>{formatDateTime(analysisDetail.startedAt || analysisDetail.createdAt)}</dd></div>
               <div><dt>Completed</dt><dd>{formatDateTime(analysisDetail.completedAt)}</dd></div>
-              <div><dt>Confidence</dt><dd>{analysisDetail.confidence == null ? '—' : `${analysisDetail.confidence}%`}</dd></div>
-              <div><dt>Provider</dt><dd>{analysisDetail.provider || '—'}</dd></div>
-              <div><dt>Reverse search</dt><dd>{analysisDetail.reverseSearchStatus || '—'}</dd></div>
-              <div><dt>Forensics</dt><dd>{analysisDetail.forensicsStatus || '—'}</dd></div>
-              {analysisDetail.error ? (
-                <div className="admin-detail-grid__full"><dt>Error</dt><dd>{analysisDetail.error}</dd></div>
-              ) : null}
+              <div><dt>Reverse search</dt><dd>{formatPipelineStatus(analysisDetail.reverseSearchStatus)}</dd></div>
+              <div><dt>Forensics</dt><dd>{formatPipelineStatus(analysisDetail.forensicsStatus)}</dd></div>
+              {!['success', 'completed'].includes(analysisDetail.status)
+                ? analysisDetail.diagnosticError
+                  ? (
+                      <div className="admin-detail-grid__full">
+                        <dt>Failure Details</dt>
+                        <dd>{analysisDetail.diagnosticError}</dd>
+                      </div>
+                    )
+                  : analysisDetail.error
+                    ? (
+                        <div className="admin-detail-grid__full">
+                          <dt>Error</dt>
+                          <dd>{analysisDetail.error}</dd>
+                        </div>
+                      )
+                    : null
+                : null}
             </dl>
           ) : null}
         </Modal>

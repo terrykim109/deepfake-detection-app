@@ -60,6 +60,7 @@ async def admin_analyses(user: dict = Depends(require_admin)):
                 "provider": record.get("provider"),
                 "reverseSearchStatus": record.get("reverseSearchStatus"),
                 "forensicsStatus": record.get("forensicsStatus"),
+                "diagnosticError": record.get("diagnosticError"),
             }
         )
     analyses.sort(
@@ -98,6 +99,7 @@ async def admin_analysis_detail(
                 "provider": record.get("provider"),
                 "reverseSearchStatus": record.get("reverseSearchStatus"),
                 "forensicsStatus": record.get("forensicsStatus"),
+                "diagnosticError": record.get("diagnosticError"),
             }
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
