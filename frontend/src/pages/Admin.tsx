@@ -20,7 +20,7 @@ type AnalysisFilter = 'all' | 'successful' | 'failed'
 type UserFilter = 'all' | 'verified' | 'unverified'
 type SortDirection = 'asc' | 'desc'
 type AnalysisSortKey = 'analysis' | 'user' | 'status' | 'completed' | 'confidence'
-type UserSortKey = 'email' | 'createdAt' | 'verification' | 'role'
+type UserSortKey = 'email' | 'createdAt' | 'lastLogin' | 'verification' | 'role' | 'status'
 type SortState<Key extends string> = { key: Key; direction: SortDirection }
 
 function toggleSort<Key extends string>(current: SortState<Key>, key: Key): SortState<Key> {
@@ -317,8 +317,10 @@ export const Admin: React.FC = () => {
     let comparison = 0
     if (userSort.key === 'email') comparison = compareText(left.email, right.email)
     if (userSort.key === 'createdAt') comparison = compareDate(left.createdAt, right.createdAt)
+    if (userSort.key === 'lastLogin') comparison = compareDate(left.lastLogin, right.lastLogin)
     if (userSort.key === 'verification') comparison = Number(left.isVerified) - Number(right.isVerified)
     if (userSort.key === 'role') comparison = compareText(left.role, right.role)
+    if (userSort.key === 'status') comparison = compareText(left.status, right.status)
     if (comparison === 0) comparison = compareText(left.userId, right.userId)
     return userSort.direction === 'asc' ? comparison : -comparison
   })
@@ -463,6 +465,8 @@ export const Admin: React.FC = () => {
                           <th aria-sort={sortAria(userSort, 'createdAt')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'createdAt'))}>Registration date{sortArrow(userSort, 'createdAt')}</button></th>
                           <th aria-sort={sortAria(userSort, 'verification')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'verification'))}>Verification{sortArrow(userSort, 'verification')}</button></th>
                           <th aria-sort={sortAria(userSort, 'role')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'role'))}>Role{sortArrow(userSort, 'role')}</button></th>
+                          <th aria-sort={sortAria(userSort, 'lastLogin')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'lastLogin'))}>Last login{sortArrow(userSort, 'lastLogin')}</button></th>
+                          <th aria-sort={sortAria(userSort, 'status')}><button className="admin-sort-button" type="button" onClick={() => setUserSort((sort) => toggleSort(sort, 'status'))}>Status{sortArrow(userSort, 'status')}</button></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -472,6 +476,8 @@ export const Admin: React.FC = () => {
                             <td>{formatDate(account.createdAt)}</td>
                             <td>{account.isVerified ? 'Verified' : 'Unverified'}</td>
                             <td><span className={account.role === 'admin' ? 'admin-role admin-role--admin' : 'admin-role'}>{account.role}</span></td>
+                            <td>{formatDate(account.lastLogin)}</td>
+                            <td>{account.status === 'active' ? 'Active' : 'Disabled'}</td>
                           </tr>
                         ))}
                       </tbody>

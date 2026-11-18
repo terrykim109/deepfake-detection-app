@@ -120,6 +120,7 @@ async def admin_users(user: dict = Depends(require_admin)):
         for account in page.users:
             profile = profiles.get(account.uid, {})
             created_at = _creation_time(account)
+            last_login = _last_login_time(account)
             claims = account.custom_claims or {}
             users.append(
                 {
@@ -127,8 +128,10 @@ async def admin_users(user: dict = Depends(require_admin)):
                     "email": account.email or profile.get("email") or "",
                     "displayName": account.display_name or profile.get("display_name"),
                     "createdAt": created_at,
+                    "lastLogin": last_login,
                     "isVerified": bool(account.email_verified),
                     "role": "admin" if claims.get("admin") is True else "user",
+                    "status": "disabled" if getattr(account, "disabled", False) else "active",
                 }
             )
         page = page.get_next_page()
@@ -146,6 +149,19 @@ async def admin_users(user: dict = Depends(require_admin)):
 def _creation_time(account: Any) -> str | None:
     metadata = getattr(account, "user_metadata", None)
     timestamp = getattr(metadata, "creation_timestamp", None)
+    if timestamp is None:
+        return None
+    try:
+        from datetime import datetime, timezone
+
+        return datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).isoformat()
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _last_login_time(account: Any) -> str | None:
+    metadata = getattr(account, "user_metadata", None)
+    timestamp = getattr(metadata, "last_sign_in_timestamp", None)
     if timestamp is None:
         return None
     try:

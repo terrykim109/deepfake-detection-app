@@ -270,8 +270,10 @@ export interface AdminUser {
   email: string
   displayName: string | null
   createdAt: string | null
+  lastLogin: string | null
   isVerified: boolean
   role: 'admin' | 'user'
+  status: 'active' | 'disabled'
 }
 
 export interface AdminUsersResponse {
