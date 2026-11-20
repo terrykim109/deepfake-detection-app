@@ -52,7 +52,7 @@ const FACTS = [
 ]
 
 // About where people start to lose focus on a wait (NN/g response-time limits).
-const SLOW_AFTER_MS = 10_000
+const SLOW_AFTER_MS = 20_000
 
 type StepState = 'done' | 'active' | 'todo'
 
