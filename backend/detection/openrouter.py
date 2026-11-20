@@ -11,9 +11,11 @@ from statistics import median
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from config import OPENROUTER_API_KEY, OPENROUTER_MODELS
 from detection.base import DetectionError, DetectionResult
+from schemas import ModelAnalysisOutput
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _TIMEOUT_SECONDS = 45.0
@@ -292,6 +294,17 @@ def _parse_model_payload(model: str, payload: dict) -> _ModelScore:
         raise ValueError("unexpected content type")
 
     data = _extract_json(content)
+
+    # Soft Pydantic pass only. exclude_unset keeps missing keys absent so
+    # data.get("verdict", "") still returns "" (not str(None) == "none").
+    # Extras are ignored; malformed findings stay for _parse_findings to filter.
+    if isinstance(data, dict):
+        try:
+            data = ModelAnalysisOutput.model_validate(data).model_dump(
+                exclude_unset=True
+            )
+        except ValidationError:
+            pass
 
     verdict = str(data.get("verdict", "")).strip().lower()
 

@@ -1,5 +1,12 @@
 import httpx
 import pytest
+import sys
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from detection.openrouter import (
     _extract_json,
@@ -106,8 +113,12 @@ def test_parse_model_payload_accepts_text_content_parts():
     assert score.verdict == "real"
     assert score.confidence == 12
     assert score.summary == "Looks authentic."
+    assert score.findings == []
 
 
 def test_extract_json_still_rejects_missing_required_fields():
     with pytest.raises(ValueError):
         _extract_json('{"verdict":"warn","confidence":70,')
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))
