@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { PublicNav } from '../components/PublicNav'
 import { ImageIcon, ShieldCheckIcon, ShieldIcon } from '../components/ui'
 
 const STEPS = [
@@ -13,17 +14,7 @@ const STEPS = [
    first screen", frames "Landing v2". */
 export const Landing: React.FC = () => (
   <div className="landing">
-    <header className="landing-nav">
-      <Link to="/" className="landing-brand">
-        <span className="landing-brand__mark" aria-hidden="true">
-          <img src="/logo.png" alt="" />
-        </span>
-        Deepfake Detection
-      </Link>
-      <Link to="/login" className="landing-login">
-        Log in
-      </Link>
-    </header>
+    <PublicNav />
 
     <main>
       <section className="landing-hero" aria-labelledby="landing-title">

@@ -3,6 +3,7 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './state/AppState'
 import { Landing } from './pages/Landing'
+import { About } from './pages/About'
 import { Login } from './pages/Login'
 import { CreateAccount } from './pages/CreateAccount'
 import { VerifyEmail } from './pages/VerifyEmail'
@@ -60,6 +61,7 @@ const AppRoutes: React.FC = () => (
     <Route path="/dashboard" element={<RequireAdmin><Admin /></RequireAdmin>} />
     {/* Design-system reference for the team — public, not linked in the nav */}
     <Route path="/styleguide" element={<StyleGuide />} />
+    <Route path="/about" element={<About />} />
     <Route path="/" element={<LandingOrApp />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

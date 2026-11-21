@@ -32,6 +32,22 @@
   padding: 28px var(--landing-gutter);
   color: #fff;
 }
+.landing-nav__links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+.landing-nav__link {
+  padding: 8px 12px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition), color var(--transition);
+}
+.landing-nav__link:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.landing-nav__link--active { color: #fff; background: rgba(255, 255, 255, 0.14); }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; }
 /* logo.png is the mark above the wordmark; show only the mark */
 .landing-brand__mark { width: 40px; height: 40px; overflow: hidden; flex: none; }
@@ -129,6 +145,8 @@
 
 @media (max-width: 767px) {
   .landing-nav { padding-block: var(--space-4); }
+  .landing-nav__links { gap: var(--space-2); }
+  .landing-nav__link { padding: 8px 10px; }
   .landing-brand__mark { width: 32px; height: 32px; }
   .landing-brand__mark img { width: 50px; margin: -1px 0 0 -9px; }
 
@@ -147,6 +165,129 @@
   .landing-steps { grid-template-columns: 1fr; gap: 0; }
   .landing-steps li { flex-direction: row; align-items: center; padding-block: var(--space-4); }
   .landing-footer { flex-direction: column; }
+}
+
+/* ───────────── About ─────────────
+   Same shell/tokens as Landing; nav stays in document flow so white
+   link text remains on the dark bar while scrolling light sections. */
+.about-page .landing-nav {
+  position: sticky;
+  top: 0;
+  inset: auto;
+  background: rgb(var(--landing-ink));
+}
+
+.about-intro {
+  background: rgb(var(--landing-ink));
+  color: #fff;
+  padding: clamp(48px, 6vw, 88px) var(--landing-gutter) clamp(56px, 7vw, 96px);
+}
+.about-intro__title {
+  max-width: 18ch;
+  font-size: clamp(2rem, 3vw + 1rem, 3.25rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.about-intro__lead {
+  margin-top: var(--space-5);
+  max-width: 40rem;
+  font-size: clamp(1.0625rem, 0.3vw + 1rem, 1.25rem);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.about-section {
+  padding: clamp(48px, 6vw, 88px) var(--landing-gutter);
+  max-width: 920px;
+}
+.about-section--access,
+.about-section--team {
+  max-width: none;
+  padding-inline: var(--landing-gutter);
+}
+.about-section--access { background: var(--subtle-bg); }
+.about-section--team { padding-bottom: clamp(64px, 8vw, 112px); }
+.about-section__title {
+  font-size: clamp(1.5rem, 1vw + 1.15rem, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+.about-section__body {
+  margin-top: var(--space-4);
+  max-width: 40rem;
+  font-size: var(--fs-lg);
+  line-height: 1.55;
+  color: var(--secondary-text);
+}
+.about-section__body + .about-section__body { margin-top: var(--space-3); }
+
+.about-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.about-membership-note {
+  margin-top: var(--space-4);
+  max-width: 36rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--borders);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+
+.about-team {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  max-width: 1100px;
+}
+.about-team__card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  height: 100%;
+}
+.about-team__photo,
+.about-team__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  flex: none;
+  object-fit: cover;
+}
+.about-team__avatar {
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft-bg);
+  color: var(--accent-ink);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.about-team__name {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.about-team__role {
+  margin-top: var(--space-1);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--secondary-text);
+}
+
+@media (max-width: 767px) {
+  .about-cta { flex-direction: column; }
+  .about-cta .ui-btn { width: 100%; }
+  .about-team { grid-template-columns: 1fr; }
 }
 
 /* ───────────── Auth (Log in / Create account) ───────────── */
