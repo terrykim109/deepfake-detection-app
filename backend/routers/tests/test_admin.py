@@ -14,12 +14,51 @@ class _FakeDocument:
         return dict(self._data)
 
 
+class _FakeDocRef:
+    def __init__(self, store: dict, doc_id: str):
+        self._store = store
+        self.id = doc_id
+
+    def get(self):
+        data = self._store.get(self.id)
+
+        class _Snap:
+            def __init__(self, payload):
+                self._payload = payload
+
+            @property
+            def exists(self):
+                return self._payload is not None
+
+            def to_dict(self):
+                return dict(self._payload) if self._payload is not None else None
+
+        return _Snap(data)
+
+    def set(self, data: dict, merge: bool = False):
+        if merge and self.id in self._store:
+            current = dict(self._store[self.id])
+            current.update(data)
+            self._store[self.id] = current
+        else:
+            self._store[self.id] = dict(data)
+
+
 class _FakeCollection:
     def __init__(self, documents=None):
         self.documents = documents or []
+        self._by_id = {doc.id: doc.to_dict() for doc in self.documents}
 
     def stream(self):
         return iter(self.documents)
+
+    def document(self, doc_id: str):
+        return _FakeDocRef(self._by_id, doc_id)
+
+    def add(self, doc: dict):
+        doc_id = f"auto-{len(self._by_id)}"
+        self._by_id[doc_id] = dict(doc)
+        return None, _FakeDocRef(self._by_id, doc_id)
 
 
 class _FakeDb:
@@ -40,20 +79,30 @@ class _FakeDb:
             ),
             "users": _FakeCollection(),
             "audit_logs": _FakeCollection(),
+            "site_content": _FakeCollection(),
         }
 
     def collection(self, name):
+        if name not in self.collections:
+            self.collections[name] = _FakeCollection()
         return self.collections[name]
 
 
+_FAKE_DB = _FakeDb()
 if "firebase_config" not in sys.modules:
     fake_firebase_config = types.ModuleType("firebase_config")
-    fake_firebase_config.db = _FakeDb()
     sys.modules["firebase_config"] = fake_firebase_config
+sys.modules["firebase_config"].db = _FAKE_DB
 
 from auth_dependency import get_current_user, require_admin
-from routers.admin import router
+from routers import admin as admin_module
+import analysis_tracking
 
+# Rebind import-time Firestore handles onto this module's seeded fake.
+admin_module.db = _FAKE_DB
+analysis_tracking.analysis_requests_ref = _FAKE_DB.collection("analysis_requests")
+admin_module.analysis_requests_ref = analysis_tracking.analysis_requests_ref
+router = admin_module.router
 
 app = FastAPI()
 app.include_router(router, prefix="/api")

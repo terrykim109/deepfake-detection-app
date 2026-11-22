@@ -72,7 +72,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             aria-current={dashboardActive ? 'page' : undefined}
             onClick={() => navigate('/dashboard')}
           >
-            Dashboard
+            Admin
           </button>
         ) : null}
       </nav>

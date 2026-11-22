@@ -1,3 +1,17 @@
+import type {
+  AboutContent,
+  AdminContentResponse,
+  LandingContent,
+  PublishedContentResponse,
+} from '../content/types'
+
+export type {
+  AboutContent,
+  LandingContent,
+  AdminContentResponse,
+  PublishedContentResponse,
+}
+
 // Local: hit FastAPI on :8000.
 // Production (Vercel): use same-origin "" so /api/* is rewritten to the backend
 // service in vercel.json. Do NOT default production to localhost — the user's
@@ -290,6 +304,25 @@ export const adminApi = {
   analysisDetail: (requestId: string) =>
     get<AdminAnalysisDetail>(`/api/admin/analyses/${encodeURIComponent(requestId)}`),
   users: () => get<AdminUsersResponse>('/api/admin/users'),
+}
+
+export const contentApi = {
+  publishedLanding: () =>
+    get<PublishedContentResponse<LandingContent>>('/api/content/landing'),
+  publishedAbout: () =>
+    get<PublishedContentResponse<AboutContent>>('/api/content/about'),
+  adminLanding: () =>
+    get<AdminContentResponse<LandingContent>>('/api/admin/content/landing'),
+  adminAbout: () =>
+    get<AdminContentResponse<AboutContent>>('/api/admin/content/about'),
+  saveLandingDraft: (content: LandingContent) =>
+    put<AdminContentResponse<LandingContent>>('/api/admin/content/landing/draft', { content }),
+  saveAboutDraft: (content: AboutContent) =>
+    put<AdminContentResponse<AboutContent>>('/api/admin/content/about/draft', { content }),
+  publishLanding: () =>
+    post<AdminContentResponse<LandingContent>>('/api/admin/content/landing/publish', {}),
+  publishAbout: () =>
+    post<AdminContentResponse<AboutContent>>('/api/admin/content/about/publish', {}),
 }
 
 async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<ApiResponse<T>> {
