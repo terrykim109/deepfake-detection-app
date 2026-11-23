@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { AppShell } from '../components/AppShell'
 import {
   adminApi,
   type AdminAnalysis,
@@ -326,9 +325,9 @@ export const Admin: React.FC = () => {
   })
 
   return (
-    <AppShell>
+    <>
       <PageHeader
-        title="Dashboard"
+        title="Overview"
         subtitle="Application usage and account access overview."
         actions={
           <Select
@@ -530,6 +529,6 @@ export const Admin: React.FC = () => {
           ) : null}
         </Modal>
       ) : null}
-    </AppShell>
+    </>
   )
 }

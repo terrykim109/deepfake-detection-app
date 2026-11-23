@@ -3,6 +3,7 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './state/AppState'
 import { Landing } from './pages/Landing'
+import { About } from './pages/About'
 import { Login } from './pages/Login'
 import { CreateAccount } from './pages/CreateAccount'
 import { VerifyEmail } from './pages/VerifyEmail'
@@ -15,6 +16,11 @@ import { ResultDetail } from './pages/ResultDetail'
 import { Learn } from './pages/Learn'
 import { StyleGuide } from './pages/StyleGuide'
 import { Admin } from './pages/Admin'
+import { AdminLayout } from './components/AdminLayout'
+import { LandingContentEditor } from './pages/admin/LandingContentEditor'
+import { AboutContentEditor } from './pages/admin/AboutContentEditor'
+import { LandingPreview } from './pages/admin/LandingPreview'
+import { AboutPreview } from './pages/admin/AboutPreview'
 import { FullPageSpinner } from './components/ui'
 
 /* ─── Auth Guards ─── */
@@ -57,9 +63,37 @@ const AppRoutes: React.FC = () => (
     <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
     <Route path="/result/:id" element={<RequireAuth><ResultDetail /></RequireAuth>} />
     <Route path="/learn" element={<RequireAuth><Learn /></RequireAuth>} />
-    <Route path="/dashboard" element={<RequireAdmin><Admin /></RequireAdmin>} />
+    <Route
+      path="/dashboard"
+      element={
+        <RequireAdmin>
+          <AdminLayout />
+        </RequireAdmin>
+      }
+    >
+      <Route index element={<Admin />} />
+      <Route path="content/landing" element={<LandingContentEditor />} />
+      <Route path="content/about" element={<AboutContentEditor />} />
+    </Route>
+    <Route
+      path="/dashboard/content/landing/preview"
+      element={
+        <RequireAdmin>
+          <LandingPreview />
+        </RequireAdmin>
+      }
+    />
+    <Route
+      path="/dashboard/content/about/preview"
+      element={
+        <RequireAdmin>
+          <AboutPreview />
+        </RequireAdmin>
+      }
+    />
     {/* Design-system reference for the team — public, not linked in the nav */}
     <Route path="/styleguide" element={<StyleGuide />} />
+    <Route path="/about" element={<About />} />
     <Route path="/" element={<LandingOrApp />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

@@ -9,6 +9,7 @@ from routers import auth
 from routers import users
 from routers import analysis
 from routers import admin
+from routers import content
 from routers import forensics
 from routers import public_images
 from temp_images import start_temp_image_sweeper
@@ -36,6 +37,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(content.router, prefix="/api")
 app.include_router(forensics.router, prefix="/api")
 # Token-gated temp image bytes for Scrappa (no Firebase auth — short-lived only)
 app.include_router(public_images.router, prefix="/api")
