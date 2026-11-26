@@ -1,0 +1,36 @@
+.level-summary {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border, #526174);
+  border-radius: 0.75rem;
+}
+
+.level-summary__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.level-summary__controls select,
+.level-summary__controls button {
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.5rem;
+}
+
+.level-summary__output {
+  line-height: 1.6;
+}
+
+.level-summary__error {
+  color: var(--alert-error-fg, #ff8585);
+}
+
+.level-summary__notice {
+  color: var(--alert-info-fg, #8fb8ff);
+}
+
+.level-summary__status {
+  color: var(--secondary-text, #a8b3c1);
+}

@@ -31,6 +31,10 @@ export function setTokenGetter(fn: () => string | null) {
   tokenGetter = fn
 }
 
+export function getToken() {
+  return tokenGetter()
+}
+
 function authHeaders(base?: HeadersInit, explicitToken?: string | null): Headers {
   const headers = new Headers(base)
   const token = explicitToken ?? tokenGetter()
